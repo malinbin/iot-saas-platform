@@ -47,7 +47,7 @@ export default function TemplateDetailPage() {
       if (res.ok) {
         const data = await res.json();
         setTemplate(data.template);
-        setFields(data.fields || []);
+        setFields(data.template?.fields || data.fields || []);
       }
     } catch (error) {
       console.error('加载模板失败:', error);

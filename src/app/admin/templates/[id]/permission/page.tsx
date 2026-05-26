@@ -105,7 +105,7 @@ export default function TemplatePermissionPage() {
       const vendorsRes = await fetch('/api/admin/vendors?status=approved');
       if (vendorsRes.ok) {
         const data = await vendorsRes.json();
-        setVendors(data.vendors || []);
+        setVendors(data.data || data.vendors || []);
       }
     } catch (error) {
       console.error('加载数据失败:', error);

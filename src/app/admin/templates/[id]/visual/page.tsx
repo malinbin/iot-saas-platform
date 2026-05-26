@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useCallback, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import {
   DndContext,
   closestCenter,
@@ -413,12 +413,11 @@ function PreviewPanel({
   );
 }
 
-export default function VisualTemplateEditor({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default function VisualTemplateEditor() {
   const router = useRouter();
+  const params = useParams();
+  const templateId = params.id as string;
+  
   const [templateName, setTemplateName] = useState('新设备模板');
   const [templateCategory, setTemplateCategory] = useState('industrial');
   const [fields, setFields] = useState<FieldConfig[]>([]);
@@ -428,6 +427,50 @@ export default function VisualTemplateEditor({
   );
   const [deviceType, setDeviceType] = useState('custom');
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // 加载模板数据
+  useEffect(() => {
+    const loadTemplate = async () => {
+      try {
+        const res = await fetch(`/api/admin/templates/${templateId}`);
+        if (res.ok) {
+          const data = await res.json();
+          const template = data.template;
+          setTemplateName(template.name);
+          setTemplateCategory(template.category || 'industrial');
+          
+          // 转换字段格式
+          if (template.fields && template.fields.length > 0) {
+            const loadedFields = template.fields.map((f: any) => ({
+              id: f.id || `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              key: f.field_key,
+              name: f.field_name,
+              type: f.field_type || 'number',
+              unit: f.unit || '',
+              icon: f.icon || 'Activity',
+              color: f.color || '#3b82f6',
+              chartType: f.chart_type || 'line',
+              minValue: f.min_value || f.alert_min,
+              maxValue: f.max_value || f.alert_max,
+              showInDashboard: f.show_in_dashboard !== false,
+              showInList: f.show_in_list !== false,
+              width: f.card_width || 'half',
+            }));
+            setFields(loadedFields);
+          }
+        }
+      } catch (error) {
+        console.error('加载模板失败:', error);
+        toast.error('加载模板失败');
+      }
+      setLoading(false);
+    };
+    
+    if (templateId) {
+      loadTemplate();
+    }
+  }, [templateId]);
 
   const selectedField = fields.find((f) => f.id === selectedFieldId);
 
@@ -503,7 +546,7 @@ export default function VisualTemplateEditor({
     setSaving(true);
     try {
       // 调用API保存
-      const response = await fetch(`/api/admin/templates/${params.id}`, {
+      const response = await fetch(`/api/admin/templates/${templateId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
