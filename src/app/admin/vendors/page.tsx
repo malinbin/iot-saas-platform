@@ -39,6 +39,7 @@ import {
   Eye,
   Edit,
   Trash2,
+  Key,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -68,6 +69,9 @@ export default function VendorManagementPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [detailOpen, setDetailOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirmPassword: '' });
+  const [savingPassword, setSavingPassword] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [editForm, setEditForm] = useState({
     name: '',
@@ -203,6 +207,49 @@ export default function VendorManagementPage() {
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '永久有效';
     return new Date(dateStr).toLocaleDateString('zh-CN');
+  };
+
+  // 打开密码设置对话框
+  const openPasswordDialog = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setPasswordForm({ password: '', confirmPassword: '' });
+    setPasswordOpen(true);
+  };
+
+  // 设置密码
+  const handleSetPassword = async () => {
+    if (!selectedVendor) return;
+    
+    if (passwordForm.password.length < 6) {
+      toast({ title: '密码长度至少6位', variant: 'error' });
+      return;
+    }
+    
+    if (passwordForm.password !== passwordForm.confirmPassword) {
+      toast({ title: '两次输入的密码不一致', variant: 'error' });
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const response = await fetch(`/api/admin/vendors/${selectedVendor.id}/password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordForm.password })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: '密码设置成功', description: `厂家 ${selectedVendor.name} 的登录密码已更新` });
+        setPasswordOpen(false);
+      } else {
+        toast({ title: data.error || '设置失败', variant: 'error' });
+      }
+    } catch (error) {
+      toast({ title: '网络错误', variant: 'error' });
+    } finally {
+      setSavingPassword(false);
+    }
   };
 
   // 筛选厂家
@@ -418,6 +465,13 @@ export default function VendorManagementPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             className="focus:bg-[#1E3A5F]"
+                            onClick={() => openPasswordDialog(vendor)}
+                          >
+                            <Key className="mr-2 h-4 w-4 text-[#2563EB]" />
+                            设置密码
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="focus:bg-[#1E3A5F]"
                             onClick={() => handleToggleActive(vendor)}
                           >
                             <Switch checked={vendor.is_active} className="mr-2 h-4 w-4" />
@@ -570,6 +624,59 @@ export default function VendorManagementPage() {
               className="bg-[#2563EB] hover:bg-[#2563EB]/90"
             >
               保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 密码设置对话框 */}
+      <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
+        <DialogContent className="border-[#1E3A5F] bg-[#0A1628] text-white">
+          <DialogHeader>
+            <DialogTitle>设置登录密码</DialogTitle>
+            <DialogDescription className="text-[#94A3B8]">
+              为厂家 {selectedVendor?.name} 设置登录密码
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-[#94A3B8]">新密码</Label>
+              <Input
+                type="password"
+                placeholder="请输入密码（至少6位）"
+                value={passwordForm.password}
+                onChange={(e) => setPasswordForm({ ...passwordForm, password: e.target.value })}
+                className="border-[#1E3A5F] bg-[#0A1628] text-white"
+              />
+            </div>
+            <div>
+              <Label className="text-[#94A3B8]">确认密码</Label>
+              <Input
+                type="password"
+                placeholder="请再次输入密码"
+                value={passwordForm.confirmPassword}
+                onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                className="border-[#1E3A5F] bg-[#0A1628] text-white"
+              />
+            </div>
+            <p className="text-xs text-[#94A3B8]">
+              提示：厂家可使用编码 + 密码登录厂家后台
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPasswordOpen(false)}
+              className="border-[#1E3A5F] text-[#94A3B8] hover:bg-[#1E3A5F] hover:text-white"
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleSetPassword}
+              disabled={savingPassword}
+              className="bg-[#2563EB] hover:bg-[#2563EB]/90"
+            >
+              {savingPassword ? '保存中...' : '保存密码'}
             </Button>
           </DialogFooter>
         </DialogContent>
