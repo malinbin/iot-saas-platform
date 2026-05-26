@@ -1,21 +1,31 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { VendorAuthProvider, useVendorAuth } from '@/contexts/vendor-auth';
 import { VendorSidebar } from '@/components/vendor/sidebar';
 import { VendorHeader } from '@/components/vendor/header';
 
 function VendorLayoutContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { loading, isLoggedIn } = useVendorAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  // 登录页面不需要认证检查
+  const isLoginPage = pathname === '/vendor/login';
+
   useEffect(() => {
-    if (!loading && !isLoggedIn) {
+    // 非登录页面且未登录时，跳转到登录页
+    if (!isLoginPage && !loading && !isLoggedIn) {
       router.push('/vendor/login');
     }
-  }, [loading, isLoggedIn, router]);
+  }, [isLoginPage, loading, isLoggedIn, router]);
+
+  // 登录页面直接显示内容
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   if (loading) {
     return (
