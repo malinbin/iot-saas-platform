@@ -54,6 +54,112 @@ export const vendors = pgTable(
   ]
 );
 
+// ==================== 设备模板系统 ====================
+
+// 设备模板表（管理员DIY设备类型）
+export const deviceTemplates = pgTable(
+  "device_templates",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+    name: varchar("name", { length: 128 }).notNull(), // 模板名称，如"注塑机"、"数控车床"
+    code: varchar("code", { length: 50 }).notNull().unique(), // 模板编码
+    category: varchar("category", { length: 50 }).notNull(), // 分类：生产设备、检测设备、辅助设备
+    description: text("description"),
+    icon: varchar("icon", { length: 100 }), // 图标名称
+    image_url: varchar("image_url", { length: 500 }), // 模板图片
+    
+    // 页面配置（JSON格式）
+    dashboard_config: jsonb("dashboard_config").notNull(), // 仪表盘布局配置
+    detail_config: jsonb("detail_config").notNull(), // 详情页配置
+    
+    // 告警规则配置
+    alert_rules: jsonb("alert_rules"), // 告警规则
+    
+    is_active: boolean("is_active").default(true).notNull(),
+    created_by: varchar("created_by", { length: 36 }), // 创建人
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp("updated_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("device_templates_code_idx").on(table.code),
+    index("device_templates_category_idx").on(table.category),
+  ]
+);
+
+// 模板字段定义表（自定义参数字段）
+export const templateFields = pgTable(
+  "template_fields",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+    template_id: varchar("template_id", { length: 36 }).notNull().references(() => deviceTemplates.id, { onDelete: 'cascade' }),
+    
+    // 字段配置
+    field_key: varchar("field_key", { length: 100 }).notNull(), // 字段键名，如"temperature"
+    field_name: varchar("field_name", { length: 128 }).notNull(), // 显示名称，如"温度"
+    field_type: varchar("field_type", { length: 30 }).notNull(), // number, string, boolean, enum, date
+    
+    // 数值类型配置
+    unit: varchar("unit", { length: 20 }), // 单位，如"℃"、"kW"
+    min_value: numeric("min_value", { precision: 12, scale: 4 }), // 最小值
+    max_value: numeric("max_value", { precision: 12, scale: 4 }), // 最大值
+    default_value: varchar("default_value", { length: 255 }), // 默认值
+    
+    // 枚举值配置（field_type=enum时使用）
+    enum_options: jsonb("enum_options"), // [{label: "运行", value: "running"}, ...]
+    
+    // 显示配置
+    icon: varchar("icon", { length: 50 }), // 字段图标
+    color: varchar("color", { length: 20 }), // 显示颜色
+    show_in_list: boolean("show_in_list").default(false).notNull(), // 是否在列表显示
+    show_in_dashboard: boolean("show_in_dashboard").default(true).notNull(), // 是否在仪表盘显示
+    show_in_detail: boolean("show_in_detail").default(true).notNull(), // 是否在详情页显示
+    chart_type: varchar("chart_type", { length: 20 }), // line, bar, gauge, none
+    
+    // 告警配置
+    alert_min: numeric("alert_min", { precision: 12, scale: 4 }), // 告警下限
+    alert_max: numeric("alert_max", { precision: 12, scale: 4 }), // 告警上限
+    warning_min: numeric("warning_min", { precision: 12, scale: 4 }), // 预警下限
+    warning_max: numeric("warning_max", { precision: 12, scale: 4 }), // 预警上限
+    
+    sort_order: integer("sort_order").default(0), // 排序
+    group_name: varchar("group_name", { length: 50 }), // 分组名称
+    
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("template_fields_template_id_idx").on(table.template_id),
+  ]
+);
+
+// 模板授权表（授权给厂家使用）
+export const templatePermissions = pgTable(
+  "template_permissions",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+    template_id: varchar("template_id", { length: 36 }).notNull().references(() => deviceTemplates.id, { onDelete: 'cascade' }),
+    vendor_id: varchar("vendor_id", { length: 36 }).notNull().references(() => vendors.id, { onDelete: 'cascade' }),
+    
+    // 权限配置
+    can_view: boolean("can_view").default(true).notNull(), // 可查看
+    can_create: boolean("can_create").default(true).notNull(), // 可创建设备
+    can_edit: boolean("can_edit").default(false).notNull(), // 可编辑模板（通常不允许）
+    
+    // 自定义配置（厂家可覆盖默认值）
+    custom_config: jsonb("custom_config"), // 厂家自定义配置
+    
+    is_active: boolean("is_active").default(true).notNull(),
+    granted_by: varchar("granted_by", { length: 36 }), // 授权人
+    granted_at: timestamp("granted_at", { withTimezone: true }).defaultNow().notNull(),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("template_permissions_template_id_idx").on(table.template_id),
+    index("template_permissions_vendor_id_idx").on(table.vendor_id),
+  ]
+);
+
+// ==================== 原有表 ====================
+
 // 设备表
 export const devices = pgTable(
   "devices",
@@ -62,6 +168,7 @@ export const devices = pgTable(
     name: varchar("name", { length: 128 }).notNull(),
     serial_number: varchar("serial_number", { length: 100 }).notNull().unique(),
     vendor_id: varchar("vendor_id", { length: 36 }).notNull().references(() => vendors.id),
+    template_id: varchar("template_id", { length: 36 }).references(() => deviceTemplates.id), // 设备模板ID
     owner_id: varchar("owner_id", { length: 36 }), // 设备所有者（用户）
     device_type: varchar("device_type", { length: 50 }).notNull(), // 生产设备、传感器等
     model: varchar("model", { length: 100 }),
@@ -78,6 +185,7 @@ export const devices = pgTable(
   (table) => [
     index("devices_serial_number_idx").on(table.serial_number),
     index("devices_vendor_id_idx").on(table.vendor_id),
+    index("devices_template_id_idx").on(table.template_id),
     index("devices_owner_id_idx").on(table.owner_id),
     index("devices_status_idx").on(table.status),
   ]

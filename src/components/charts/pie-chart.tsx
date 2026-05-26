@@ -9,7 +9,7 @@ import {
   Tooltip,
 } from 'recharts';
 
-interface PieChartData {
+export interface PieChartData {
   name: string;
   value: number;
   color: string;

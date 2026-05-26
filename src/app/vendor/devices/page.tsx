@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -14,6 +14,12 @@ import {
   Filter,
   Plus,
   Cpu,
+  Cog,
+  Wrench,
+  Thermometer,
+  Gauge,
+  Zap,
+  LayoutTemplate,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,13 +57,34 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+
+interface Template {
+  id: string;
+  name: string;
+  code: string;
+  category: string;
+  icon?: string;
+  description?: string;
+  can_create: boolean;
+}
+
+interface TemplateField {
+  field_key: string;
+  field_name: string;
+  field_type: string;
+  unit?: string;
+  default_value?: string;
+}
 
 interface Device {
   id: string;
   name: string;
   sn: string;
   type: string;
+  template_id?: string;
+  template_name?: string;
   status: 'online' | 'offline' | 'fault';
   location: string;
   customer: string;
@@ -68,9 +95,11 @@ interface Device {
 const mockDevices: Device[] = [
   {
     id: '1',
-    name: 'CNC加工中心-01',
+    name: '注塑机-01',
     sn: 'SN202401001',
-    type: 'CNC加工中心',
+    type: '注塑机',
+    template_id: 'tpl_1',
+    template_name: '注塑机',
     status: 'online',
     location: '华东机械-A车间',
     customer: '华东机械制造厂',
@@ -79,9 +108,11 @@ const mockDevices: Device[] = [
   },
   {
     id: '2',
-    name: '激光切割机-03',
+    name: '数控车床-03',
     sn: 'SN202401015',
-    type: '激光切割机',
+    type: '数控车床',
+    template_id: 'tpl_2',
+    template_name: '数控车床',
     status: 'online',
     location: '华东机械-B车间',
     customer: '华东机械制造厂',
@@ -90,25 +121,16 @@ const mockDevices: Device[] = [
   },
   {
     id: '3',
-    name: '注塑机-02',
+    name: '温湿度传感器-02',
     sn: 'SN202401008',
-    type: '注塑机',
+    type: '温湿度传感器',
+    template_id: 'tpl_3',
+    template_name: '温湿度传感器',
     status: 'offline',
     location: '南方精密-1号车间',
     customer: '南方精密加工',
     lastUpdate: '2024-01-15 12:00:00',
     alerts: 0,
-  },
-  {
-    id: '4',
-    name: '冲压机-01',
-    sn: 'SN202401012',
-    type: '冲压机',
-    status: 'fault',
-    location: '北方重工-主车间',
-    customer: '北方重工集团',
-    lastUpdate: '2024-01-15 14:15:00',
-    alerts: 2,
   },
 ];
 
@@ -131,14 +153,89 @@ export default function VendorDevicesPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [devices, setDevices] = useState<Device[]>(mockDevices);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [templateFields, setTemplateFields] = useState<TemplateField[]>([]);
+  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  
   const [newDevice, setNewDevice] = useState({
     name: '',
-    type: '',
     sn: '',
     location: '',
     customer: '',
     description: '',
   });
+  
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+
+  // 加载可用模板
+  useEffect(() => {
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    setLoadingTemplates(true);
+    try {
+      const res = await fetch('/api/vendor/templates');
+      if (res.ok) {
+        const data = await res.json();
+        setTemplates(data.templates || []);
+      }
+    } catch (error) {
+      console.error('加载模板失败:', error);
+      // 使用模拟数据
+      setTemplates([
+        { id: 'tpl_1', name: '注塑机', code: 'injection_molding', category: '生产设备', icon: 'Cog', can_create: true },
+        { id: 'tpl_2', name: '数控车床', code: 'cnc_lathe', category: '生产设备', icon: 'Wrench', can_create: true },
+        { id: 'tpl_3', name: '温湿度传感器', code: 'temp_humidity_sensor', category: '检测设备', icon: 'Thermometer', can_create: true },
+      ]);
+    }
+    setLoadingTemplates(false);
+  };
+
+  // 选择模板后加载字段
+  const handleSelectTemplate = async (template: Template) => {
+    setSelectedTemplate(template);
+    
+    try {
+      const res = await fetch(`/api/admin/templates/${template.id}/fields`);
+      if (res.ok) {
+        const data = await res.json();
+        setTemplateFields(data.fields || []);
+        
+        // 设置默认值
+        const defaults: Record<string, string> = {};
+        (data.fields || []).forEach((f: TemplateField) => {
+          if (f.default_value) {
+            defaults[f.field_key] = f.default_value;
+          }
+        });
+        setFieldValues(defaults);
+      }
+    } catch (error) {
+      console.error('加载字段失败:', error);
+      // 使用模拟数据
+      const mockFields: TemplateField[] = template.code === 'injection_molding' ? [
+        { field_key: 'temperature', field_name: '温度', field_type: 'number', unit: '℃' },
+        { field_key: 'pressure', field_name: '压力', field_type: 'number', unit: 'MPa' },
+        { field_key: 'speed', field_name: '转速', field_type: 'number', unit: 'rpm' },
+        { field_key: 'power', field_name: '功率', field_type: 'number', unit: 'kW' },
+      ] : template.code === 'cnc_lathe' ? [
+        { field_key: 'speed', field_name: '转速', field_type: 'number', unit: 'rpm' },
+        { field_key: 'power', field_name: '功率', field_type: 'number', unit: 'kW' },
+        { field_key: 'efficiency', field_name: '效率', field_type: 'number', unit: '%' },
+      ] : [
+        { field_key: 'temperature', field_name: '温度', field_type: 'number', unit: '℃' },
+        { field_key: 'humidity', field_name: '湿度', field_type: 'number', unit: '%' },
+      ];
+      setTemplateFields(mockFields);
+    }
+    
+    // 自动填充设备名称前缀
+    if (!newDevice.name) {
+      setNewDevice(prev => ({ ...prev, name: `${template.name}-` }));
+    }
+  };
 
   const filteredDevices = devices.filter(d => {
     const matchSearch = d.name.includes(search) || d.sn.includes(search);
@@ -153,234 +250,360 @@ export default function VendorDevicesPage() {
     fault: devices.filter(d => d.status === 'fault').length,
   };
 
-  const handleAddDevice = () => {
-    if (!newDevice.name || !newDevice.type || !newDevice.sn) {
+  const handleAddDevice = async () => {
+    if (!newDevice.name || !newDevice.sn || !selectedTemplate) {
       toast({
         title: '请填写完整信息',
-        description: '设备名称、类型和序列号为必填项',
+        description: '设备名称、序列号和模板为必填项',
         variant: 'error',
       });
       return;
     }
 
-    const device: Device = {
-      id: String(devices.length + 1),
-      name: newDevice.name,
-      sn: newDevice.sn,
-      type: newDevice.type,
-      status: 'offline',
-      location: newDevice.location || '未设置',
-      customer: newDevice.customer || '未分配',
-      lastUpdate: new Date().toLocaleString(),
-      alerts: 0,
-    };
+    try {
+      const res = await fetch('/api/vendor/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newDevice,
+          template_id: selectedTemplate.id,
+          device_type: selectedTemplate.name,
+          field_values: fieldValues,
+        }),
+      });
 
-    setDevices([...devices, device]);
-    setAddDialogOpen(false);
+      if (res.ok) {
+        toast({
+          title: '设备添加成功',
+          description: `设备 ${newDevice.name} 已添加到系统`,
+        });
+        setAddDialogOpen(false);
+        resetForm();
+        // 刷新设备列表
+      } else {
+        // 本地模拟添加
+        const device: Device = {
+          id: String(devices.length + 1),
+          name: newDevice.name,
+          sn: newDevice.sn,
+          type: selectedTemplate.name,
+          template_id: selectedTemplate.id,
+          template_name: selectedTemplate.name,
+          status: 'offline',
+          location: newDevice.location || '未设置',
+          customer: newDevice.customer || '未分配',
+          lastUpdate: new Date().toLocaleString(),
+          alerts: 0,
+        };
+        setDevices([...devices, device]);
+        setAddDialogOpen(false);
+        resetForm();
+        toast({
+          title: '设备添加成功',
+          description: `设备 ${device.name} 已添加到系统`,
+        });
+      }
+    } catch (error) {
+      // 本地模拟添加
+      const device: Device = {
+        id: String(devices.length + 1),
+        name: newDevice.name,
+        sn: newDevice.sn,
+        type: selectedTemplate?.name || '未知',
+        template_id: selectedTemplate?.id,
+        template_name: selectedTemplate?.name,
+        status: 'offline',
+        location: newDevice.location || '未设置',
+        customer: newDevice.customer || '未分配',
+        lastUpdate: new Date().toLocaleString(),
+        alerts: 0,
+      };
+      setDevices([...devices, device]);
+      setAddDialogOpen(false);
+      resetForm();
+      toast({
+        title: '设备添加成功',
+        description: `设备 ${device.name} 已添加到系统`,
+      });
+    }
+  };
+
+  const resetForm = () => {
     setNewDevice({
       name: '',
-      type: '',
       sn: '',
       location: '',
       customer: '',
       description: '',
     });
-    toast({
-      title: '设备添加成功',
-      description: `设备 ${device.name} 已添加到系统`,
-    });
+    setSelectedTemplate(null);
+    setTemplateFields([]);
+    setFieldValues({});
   };
 
   const handleDTUConfig = (deviceId: string) => {
     router.push(`/vendor/dtu?device=${deviceId}`);
   };
 
+  const getTemplateIcon = (icon?: string) => {
+    switch (icon) {
+      case 'Cog': return <Cog className="h-5 w-5" />;
+      case 'Wrench': return <Wrench className="h-5 w-5" />;
+      case 'Thermometer': return <Thermometer className="h-5 w-5" />;
+      case 'Gauge': return <Gauge className="h-5 w-5" />;
+      case 'Zap': return <Zap className="h-5 w-5" />;
+      default: return <Activity className="h-5 w-5" />;
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#1E293B]">设备管理</h1>
-          <p className="text-sm text-[#64748B]">管理旗下所有设备</p>
-        </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            className="border-[#E2E8F0]"
-            onClick={() => router.push('/vendor/dtu')}
-          >
-            <Cpu className="mr-2 h-4 w-4" />
-            DTU配置
-          </Button>
-          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-[#2563EB] hover:bg-[#1D4ED8]">
-                <Plus className="mr-2 h-4 w-4" />
-                添加设备
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>添加新设备</DialogTitle>
-                <DialogDescription>
-                  填写设备信息，添加后可在DTU配置中设置通信参数
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name">设备名称 *</Label>
-                  <Input
-                    id="name"
-                    placeholder="如：CNC加工中心-01"
-                    value={newDevice.name}
-                    onChange={(e) => setNewDevice({ ...newDevice, name: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="type">设备类型 *</Label>
-                  <Select
-                    value={newDevice.type}
-                    onValueChange={(v) => setNewDevice({ ...newDevice, type: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择设备类型" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="CNC加工中心">CNC加工中心</SelectItem>
-                      <SelectItem value="激光切割机">激光切割机</SelectItem>
-                      <SelectItem value="注塑机">注塑机</SelectItem>
-                      <SelectItem value="冲压机">冲压机</SelectItem>
-                      <SelectItem value="焊接机器人">焊接机器人</SelectItem>
-                      <SelectItem value="其他">其他</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="sn">设备序列号 *</Label>
-                  <Input
-                    id="sn"
-                    placeholder="如：SN202401001"
-                    value={newDevice.sn}
-                    onChange={(e) => setNewDevice({ ...newDevice, sn: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="location">安装位置</Label>
-                  <Input
-                    id="location"
-                    placeholder="如：华东机械-A车间"
-                    value={newDevice.location}
-                    onChange={(e) => setNewDevice({ ...newDevice, location: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="customer">所属客户</Label>
-                  <Input
-                    id="customer"
-                    placeholder="如：华东机械制造厂"
-                    value={newDevice.customer}
-                    onChange={(e) => setNewDevice({ ...newDevice, customer: e.target.value })}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="description">备注说明</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="设备备注信息"
-                    value={newDevice.description}
-                    onChange={(e) => setNewDevice({ ...newDevice, description: e.target.value })}
-                  />
-                </div>
+      {/* 统计卡片 */}
+      <div className="grid grid-cols-4 gap-4">
+        <Card className="bg-white border border-slate-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
+                <Box className="h-5 w-5" />
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
-                  取消
-                </Button>
-                <Button className="bg-[#2563EB] hover:bg-[#1D4ED8]" onClick={handleAddDevice}>
-                  添加设备
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border-[#E2E8F0]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#64748B]">总设备数</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#1E293B]">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-[#E2E8F0]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#64748B]">在线设备</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#22C55E]">{stats.online}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-[#E2E8F0]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#64748B]">离线设备</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#DC2626]">{stats.offline}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-[#E2E8F0]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#64748B]">故障设备</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#F97316]">{stats.fault}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filter */}
-      <Card className="border-[#E2E8F0]">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
-              <Input
-                placeholder="搜索设备名称或序列号..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
+              <div>
+                <div className="text-sm text-slate-500">设备总数</div>
+                <div className="text-2xl font-bold text-slate-900">{stats.total}</div>
+              </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="状态筛选" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部状态</SelectItem>
-                <SelectItem value="online">在线</SelectItem>
-                <SelectItem value="offline">离线</SelectItem>
-                <SelectItem value="fault">故障</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+        <Card className="bg-white border border-slate-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-green-50 text-green-600">
+                <Activity className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="text-sm text-slate-500">在线设备</div>
+                <div className="text-2xl font-bold text-slate-900">{stats.online}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white border border-slate-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-red-50 text-red-600">
+                <Power className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="text-sm text-slate-500">离线设备</div>
+                <div className="text-2xl font-bold text-slate-900">{stats.offline}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-white border border-slate-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-yellow-50 text-yellow-600">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="text-sm text-slate-500">故障设备</div>
+                <div className="text-2xl font-bold text-slate-900">{stats.fault}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Table */}
-      <Card className="border-[#E2E8F0]">
-        <CardContent className="pt-6">
+      {/* 工具栏 */}
+      <div className="flex items-center gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索设备名称或序列号..."
+            className="pl-10"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-32">
+            <SelectValue placeholder="状态筛选" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部状态</SelectItem>
+            <SelectItem value="online">在线</SelectItem>
+            <SelectItem value="offline">离线</SelectItem>
+            <SelectItem value="fault">故障</SelectItem>
+          </SelectContent>
+        </Select>
+        <Dialog open={addDialogOpen} onOpenChange={(open) => {
+          setAddDialogOpen(open);
+          if (!open) resetForm();
+        }}>
+          <DialogTrigger asChild>
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-4 w-4 mr-2" />
+              添加设备
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <LayoutTemplate className="h-5 w-5 text-blue-600" />
+                添加设备
+              </DialogTitle>
+              <DialogDescription>
+                选择设备模板，然后填写设备信息
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6 py-4">
+              {/* Step 1: 选择模板 */}
+              <div>
+                <Label className="text-base font-medium mb-3 block">
+                  1. 选择设备模板 <span className="text-red-500">*</span>
+                </Label>
+                <div className="grid grid-cols-3 gap-3">
+                  {templates.map((template) => (
+                    <div
+                      key={template.id}
+                      className={`
+                        p-4 rounded-lg border-2 cursor-pointer transition-all
+                        ${selectedTemplate?.id === template.id 
+                          ? 'border-blue-500 bg-blue-50' 
+                          : 'border-slate-200 hover:border-slate-300'}
+                      `}
+                      onClick={() => handleSelectTemplate(template)}
+                    >
+                      <div className="flex flex-col items-center text-center gap-2">
+                        <div className={`p-2 rounded-lg ${
+                          selectedTemplate?.id === template.id ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {getTemplateIcon(template.icon)}
+                        </div>
+                        <div className="font-medium">{template.name}</div>
+                        <div className="text-xs text-slate-500">{template.category}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {templates.length === 0 && !loadingTemplates && (
+                  <div className="text-center py-8 text-slate-500 border rounded-lg">
+                    暂无可用模板，请联系管理员授权
+                  </div>
+                )}
+              </div>
+
+              {/* Step 2: 填写基本信息 */}
+              {selectedTemplate && (
+                <div className="space-y-4 animate-in fade-in-0 duration-200">
+                  <Label className="text-base font-medium">2. 设备基本信息</Label>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>设备名称 *</Label>
+                      <Input
+                        value={newDevice.name}
+                        onChange={(e) => setNewDevice({ ...newDevice, name: e.target.value })}
+                        placeholder={`${selectedTemplate.name}-01`}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>设备序列号 *</Label>
+                      <Input
+                        value={newDevice.sn}
+                        onChange={(e) => setNewDevice({ ...newDevice, sn: e.target.value })}
+                        placeholder="SN202401001"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>安装位置</Label>
+                      <Input
+                        value={newDevice.location}
+                        onChange={(e) => setNewDevice({ ...newDevice, location: e.target.value })}
+                        placeholder="如：华东机械-A车间"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>所属客户</Label>
+                      <Input
+                        value={newDevice.customer}
+                        onChange={(e) => setNewDevice({ ...newDevice, customer: e.target.value })}
+                        placeholder="如：华东机械制造厂"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>备注说明</Label>
+                    <Textarea
+                      value={newDevice.description}
+                      onChange={(e) => setNewDevice({ ...newDevice, description: e.target.value })}
+                      placeholder="设备安装说明、特殊配置等..."
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: 参数初始值（可选） */}
+              {selectedTemplate && templateFields.length > 0 && (
+                <div className="space-y-4">
+                  <Label className="text-base font-medium">3. 参数初始值（可选）</Label>
+                  <div className="text-sm text-slate-500 mb-2">
+                    设置设备的初始参数值，后续可通过DTU上报实时数据
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {templateFields.map((field) => (
+                      <div key={field.field_key} className="space-y-2">
+                        <Label className="flex items-center gap-1">
+                          {field.field_name}
+                          {field.unit && <span className="text-slate-400 text-xs">({field.unit})</span>}
+                        </Label>
+                        <Input
+                          type={field.field_type === 'number' ? 'number' : 'text'}
+                          value={fieldValues[field.field_key] || ''}
+                          onChange={(e) => setFieldValues({
+                            ...fieldValues,
+                            [field.field_key]: e.target.value
+                          })}
+                          placeholder={`输入${field.field_name}...`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
+                取消
+              </Button>
+              <Button 
+                onClick={handleAddDevice}
+                disabled={!selectedTemplate}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                确认添加
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* 设备列表 */}
+      <Card className="bg-white border border-slate-200">
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-slate-50">
                 <TableHead>设备信息</TableHead>
+                <TableHead>模板</TableHead>
                 <TableHead>状态</TableHead>
-                <TableHead>位置</TableHead>
                 <TableHead>客户</TableHead>
-                <TableHead>告警</TableHead>
                 <TableHead>最后更新</TableHead>
+                <TableHead>告警</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
@@ -389,55 +612,62 @@ export default function VendorDevicesPage() {
                 <TableRow key={device.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#DBEAFE]">
-                        <Box className="h-5 w-5 text-[#2563EB]" />
+                      <div className="p-2 rounded-lg bg-slate-100 text-slate-600">
+                        <Box className="h-4 w-4" />
                       </div>
                       <div>
-                        <div className="font-medium text-[#1E293B]">{device.name}</div>
-                        <div className="text-sm text-[#64748B]">{device.sn} · {device.type}</div>
+                        <div className="font-medium">{device.name}</div>
+                        <div className="text-xs text-slate-500">{device.sn}</div>
                       </div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {device.template_name ? (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-200">
+                        {device.template_name}
+                      </Badge>
+                    ) : (
+                      <span className="text-slate-400">-</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge className={statusColors[device.status]}>
                       {statusLabels[device.status]}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-[#64748B]">{device.location}</TableCell>
-                  <TableCell className="text-[#64748B]">{device.customer}</TableCell>
+                  <TableCell>
+                    <div className="text-sm">{device.customer}</div>
+                    <div className="text-xs text-slate-500">{device.location}</div>
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-500">
+                    {device.lastUpdate}
+                  </TableCell>
                   <TableCell>
                     {device.alerts > 0 ? (
-                      <Badge className="bg-[#FEE2E2] text-[#DC2626]">
-                        {device.alerts} 条告警
-                      </Badge>
+                      <Badge variant="destructive">{device.alerts}</Badge>
                     ) : (
-                      <span className="text-[#94A3B8]">-</span>
+                      <span className="text-slate-400">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-[#64748B]">{device.lastUpdate}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="sm">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => router.push(`/vendor/monitor?device=${device.id}`)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          查看监控
+                        <DropdownMenuItem>
+                          <Eye className="h-4 w-4 mr-2" />
+                          查看详情
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDTUConfig(device.id)}>
-                          <Cpu className="mr-2 h-4 w-4" />
+                          <Cpu className="h-4 w-4 mr-2" />
                           DTU配置
                         </DropdownMenuItem>
                         <DropdownMenuItem>
-                          <Settings className="mr-2 h-4 w-4" />
+                          <Settings className="h-4 w-4 mr-2" />
                           设备设置
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-[#DC2626]">
-                          <Power className="mr-2 h-4 w-4" />
-                          删除设备
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
