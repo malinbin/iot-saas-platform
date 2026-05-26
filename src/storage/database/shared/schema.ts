@@ -1,8 +1,7 @@
 import { pgTable, serial, timestamp, index, foreignKey, varchar, text, numeric, bigint, integer, jsonb, unique, boolean, uuid } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
-// 生成随机UUID的函数
-const gen_random_uuid = () => sql`gen_random_uuid()`;
+const gen_random_uuid = sql`gen_random_uuid`
 
 
 
@@ -12,7 +11,7 @@ export const healthCheck = pgTable("health_check", {
 });
 
 export const alerts = pgTable("alerts", {
-	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	id: varchar({ length: 36 }).default(gen_random_uuid).primaryKey().notNull(),
 	deviceId: varchar("device_id", { length: 36 }).notNull(),
 	vendorId: varchar("vendor_id", { length: 36 }).notNull(),
 	type: varchar({ length: 50 }).notNull(),
@@ -69,7 +68,7 @@ export const deviceData = pgTable("device_data", {
 ]);
 
 export const dtuConfigs = pgTable("dtu_configs", {
-	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	id: varchar({ length: 36 }).default(gen_random_uuid).primaryKey().notNull(),
 	deviceId: varchar("device_id", { length: 36 }).notNull(),
 	dtuSn: varchar("dtu_sn", { length: 100 }).notNull(),
 	protocol: varchar({ length: 20 }).default('mqtt').notNull(),
@@ -96,7 +95,7 @@ export const dtuConfigs = pgTable("dtu_configs", {
 ]);
 
 export const devices = pgTable("devices", {
-	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	id: varchar({ length: 36 }).default(gen_random_uuid).primaryKey().notNull(),
 	name: varchar({ length: 128 }).notNull(),
 	serialNumber: varchar("serial_number", { length: 100 }).notNull(),
 	vendorId: varchar("vendor_id", { length: 36 }).notNull(),
@@ -133,7 +132,7 @@ export const devices = pgTable("devices", {
 ]);
 
 export const vendors = pgTable("vendors", {
-	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	id: varchar({ length: 36 }).default(gen_random_uuid).primaryKey().notNull(),
 	name: varchar({ length: 128 }).notNull(),
 	code: varchar({ length: 50 }).notNull(),
 	contactName: varchar("contact_name", { length: 128 }),
@@ -148,6 +147,7 @@ export const vendors = pgTable("vendors", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 	expiresAt: timestamp("expires_at", { withTimezone: true, mode: 'string' }),
 	createdBy: uuid("created_by"),
+	isActive: boolean("is_active").default(true),
 }, (table) => [
 	index("vendors_code_idx").using("btree", table.code.asc().nullsLast().op("text_ops")),
 	index("vendors_status_idx").using("btree", table.status.asc().nullsLast().op("text_ops")),
@@ -175,7 +175,7 @@ export const userProfiles = pgTable("user_profiles", {
 ]);
 
 export const deviceTemplates = pgTable("device_templates", {
-	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	id: varchar({ length: 36 }).default(gen_random_uuid).primaryKey().notNull(),
 	name: varchar({ length: 128 }).notNull(),
 	code: varchar({ length: 50 }).notNull(),
 	category: varchar({ length: 50 }).notNull(),
@@ -196,7 +196,7 @@ export const deviceTemplates = pgTable("device_templates", {
 ]);
 
 export const templatePermissions = pgTable("template_permissions", {
-	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	id: varchar({ length: 36 }).default(gen_random_uuid).primaryKey().notNull(),
 	templateId: varchar("template_id", { length: 36 }).notNull(),
 	vendorId: varchar("vendor_id", { length: 36 }).notNull(),
 	canView: boolean("can_view").default(true).notNull(),
@@ -223,7 +223,7 @@ export const templatePermissions = pgTable("template_permissions", {
 ]);
 
 export const templateFields = pgTable("template_fields", {
-	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	id: varchar({ length: 36 }).default(gen_random_uuid).primaryKey().notNull(),
 	templateId: varchar("template_id", { length: 36 }).notNull(),
 	fieldKey: varchar("field_key", { length: 100 }).notNull(),
 	fieldName: varchar("field_name", { length: 128 }).notNull(),
@@ -257,7 +257,7 @@ export const templateFields = pgTable("template_fields", {
 ]);
 
 export const notifications = pgTable("notifications", {
-	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	id: varchar({ length: 36 }).default(gen_random_uuid).primaryKey().notNull(),
 	userId: varchar("user_id", { length: 36 }).notNull(),
 	type: varchar({ length: 50 }).notNull(),
 	title: varchar({ length: 200 }).notNull(),
@@ -273,7 +273,7 @@ export const notifications = pgTable("notifications", {
 ]);
 
 export const productionReports = pgTable("production_reports", {
-	id: varchar({ length: 36 }).default(gen_random_uuid()).primaryKey().notNull(),
+	id: varchar({ length: 36 }).default(gen_random_uuid).primaryKey().notNull(),
 	deviceId: varchar("device_id", { length: 36 }).notNull(),
 	ownerId: varchar("owner_id", { length: 36 }).notNull(),
 	date: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
