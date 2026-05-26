@@ -191,26 +191,28 @@ export const devices = pgTable(
   ]
 );
 
-// 设备实时数据表
+// 设备实时数据表（使用JSON存储动态字段）
 export const deviceData = pgTable(
   "device_data",
   {
     id: bigint("id", { mode: "number" }).primaryKey().generatedByDefaultAsIdentity(),
     device_id: varchar("device_id", { length: 36 }).notNull().references(() => devices.id),
-    temperature: numeric("temperature", { precision: 6, scale: 2 }),
-    humidity: numeric("humidity", { precision: 6, scale: 2 }),
-    power: numeric("power", { precision: 10, scale: 2 }),
-    efficiency: numeric("efficiency", { precision: 5, scale: 2 }),
-    speed: integer("speed"),
-    pressure: numeric("pressure", { precision: 6, scale: 3 }),
-    output: numeric("output", { precision: 10, scale: 2 }),
-    runtime: integer("runtime"), // 运行时长（秒）
-    raw_data: jsonb("raw_data"), // 原始数据
+    
+    // 动态字段数据（JSON格式，key对应template_fields.field_key）
+    // 示例: { "temperature": 45.2, "pressure": 5.8, "speed": 3200 }
+    data: jsonb("data").notNull(), 
+    
+    // 设备状态
+    status: varchar("status", { length: 20 }).default('online'), // online, offline, fault, maintenance
+    
+    // 元数据
     recorded_at: timestamp("recorded_at", { withTimezone: true }).defaultNow().notNull(),
+    received_at: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(), // 服务器接收时间
   },
   (table) => [
     index("device_data_device_id_idx").on(table.device_id),
     index("device_data_recorded_at_idx").on(table.recorded_at),
+    index("device_data_status_idx").on(table.status),
   ]
 );
 
