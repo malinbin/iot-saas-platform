@@ -1,4 +1,6 @@
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { createClient } from '@supabase/supabase-js';
+
+const CONFIG_KEY = 'system_settings';
 
 export interface SystemSettings {
   // 平台信息
@@ -49,26 +51,45 @@ const defaultSettings: SystemSettings = {
   apiSecret: '',
 };
 
+// 获取 Supabase admin client
+function getAdminClient() {
+  const url = process.env.COZE_SUPABASE_URL;
+  const serviceKey = process.env.COZE_SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!url || !serviceKey) {
+    return null;
+  }
+  
+  return createClient(url, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+}
+
 /**
  * 获取系统设置
  * @returns 系统设置对象
  */
 export async function getSystemSettings(): Promise<SystemSettings> {
   try {
-    const supabase = getSupabaseClient();
+    const supabase = getAdminClient();
+    if (!supabase) {
+      return defaultSettings;
+    }
     
     const { data, error } = await supabase
-      .from('configurations')
-      .select('data')
-      .eq('business_type', 'system_settings')
-      .eq('business_id', 'global')
-      .single();
+      .from('system_config')
+      .select('config_value')
+      .eq('config_key', CONFIG_KEY)
+      .maybeSingle();
     
     if (error || !data) {
       return defaultSettings;
     }
     
-    return { ...defaultSettings, ...data.data };
+    return { ...defaultSettings, ...data.config_value };
   } catch (error) {
     console.error('获取系统设置失败:', error);
     return defaultSettings;
@@ -108,21 +129,21 @@ export async function shouldEscalateAlert(
   settings?: SystemSettings
 ): Promise<boolean> {
   const config = settings || await getSystemSettings();
-  const createdTime = new Date(alertCreatedAt).getTime();
+  const alertTime = new Date(alertCreatedAt).getTime();
   const now = Date.now();
   const escalateMs = config.faultAutoEscalate * 60 * 1000;
   
-  return (now - createdTime) > escalateMs;
+  return (now - alertTime) > escalateMs;
 }
 
 /**
  * 检查IP是否在白名单中
- * @param clientIp 客户端IP
+ * @param ip 要检查的IP地址
  * @param settings 系统设置（可选）
  * @returns 是否允许访问
  */
 export async function isIpAllowed(
-  clientIp: string,
+  ip: string,
   settings?: SystemSettings
 ): Promise<boolean> {
   const config = settings || await getSystemSettings();
@@ -135,10 +156,10 @@ export async function isIpAllowed(
   // 检查IP是否在白名单中
   const whitelist = config.ipWhitelistValues
     .split(',')
-    .map(ip => ip.trim())
-    .filter(ip => ip.length > 0);
+    .map(s => s.trim())
+    .filter(Boolean);
   
-  return whitelist.includes(clientIp);
+  return whitelist.includes(ip);
 }
 
 /**
@@ -158,22 +179,6 @@ export async function getLoginFailLockCount(): Promise<number> {
 }
 
 /**
- * 获取数据保留天数
- */
-export async function getDataRetentionDays(): Promise<number> {
-  const settings = await getSystemSettings();
-  return settings.dataRetention;
-}
-
-/**
- * 获取数据采集间隔（秒）
- */
-export async function getCollectInterval(): Promise<number> {
-  const settings = await getSystemSettings();
-  return settings.collectInterval;
-}
-
-/**
  * 是否启用自动短信告警
  */
 export async function isAutoSmsAlertEnabled(): Promise<boolean> {
@@ -182,17 +187,25 @@ export async function isAutoSmsAlertEnabled(): Promise<boolean> {
 }
 
 /**
- * 是否强制双因素认证
+ * 获取数据保留天数
  */
-export async function isForceTwoFactorEnabled(): Promise<boolean> {
+export async function getDataRetentionDays(): Promise<number> {
   const settings = await getSystemSettings();
-  return settings.forceTwoFactor;
+  return settings.dataRetention;
 }
 
 /**
- * 是否自动归档
+ * 是否启用自动归档
  */
 export async function isAutoArchiveEnabled(): Promise<boolean> {
   const settings = await getSystemSettings();
   return settings.autoArchive;
+}
+
+/**
+ * 获取数据采集间隔（毫秒）
+ */
+export async function getCollectIntervalMs(): Promise<number> {
+  const settings = await getSystemSettings();
+  return settings.collectInterval * 60 * 1000;
 }
