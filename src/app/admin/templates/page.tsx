@@ -527,6 +527,11 @@ export default function DeviceTemplatesPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      <Link href={`/admin/templates/${template.id}/visual`}>
+                        <Button size="sm" variant="ghost" className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10" title="可视化编辑">
+                          <Layout className="h-4 w-4" />
+                        </Button>
+                      </Link>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -552,12 +557,12 @@ export default function DeviceTemplatesPage() {
                         <Settings className="h-4 w-4" />
                       </Button>
                       <Link href={`/admin/templates/${template.id}/permission`}>
-                        <Button size="sm" variant="ghost" className="text-slate-400 hover:text-white">
+                        <Button size="sm" variant="ghost" className="text-slate-400 hover:text-white" title="授权管理">
                           <Users className="h-4 w-4" />
                         </Button>
                       </Link>
                       <Link href={`/admin/templates/${template.id}`}>
-                        <Button size="sm" variant="ghost" className="text-slate-400 hover:text-white">
+                        <Button size="sm" variant="ghost" className="text-slate-400 hover:text-white" title="查看详情">
                           <Eye className="h-4 w-4" />
                         </Button>
                       </Link>
