@@ -117,8 +117,7 @@ export function AdminSidebar() {
                     <div className="h-2 w-2 rounded-full bg-[#22C55E] animate-pulse" />
                     <div className="text-xs text-[#94A3B8]">系统运行正常</div>
                 </div>
-                <div className="mt-2 text-xs text-[#64748B]">数据更新于 {new Date().toLocaleTimeString()}
-                </div>
+                <div className="mt-2 text-xs text-[#64748B]">数据实时更新中</div>
             </div>
         </aside>
     );

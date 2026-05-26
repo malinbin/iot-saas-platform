@@ -16,7 +16,7 @@ export function UserHeader() {
       <div className="flex h-full items-center justify-between px-6">
         {/* Left */}
         <div className="text-sm text-[#64748B]">
-          数据更新于 {new Date().toLocaleTimeString()}
+          数据实时更新中
         </div>
 
         {/* Right */}
