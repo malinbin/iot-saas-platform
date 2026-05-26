@@ -113,6 +113,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stats Cards */}
+      {stats && (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* Total Devices */}
         <Card className="bg-[#1E3A5F] border-[#2D4A6F]">
@@ -121,11 +122,11 @@ export default function AdminDashboard() {
               <div>
                 <div className="text-sm text-[#94A3B8]">设备总数</div>
                 <div className="text-3xl font-bold text-white">
-                  {stats.totalDevices}
+                  {stats.totalDevices ?? 0}
                 </div>
                 <div className="mt-2 flex items-center text-xs text-[#22C55E]">
                   <TrendingUp className="mr-1 h-3 w-3" />
-                  在线 {stats.onlineDevices} 台
+                  在线 {stats.onlineDevices ?? 0} 台
                 </div>
               </div>
               <div className="rounded-full bg-[#2563EB]/20 p-3">
@@ -142,9 +143,9 @@ export default function AdminDashboard() {
               <div>
                 <div className="text-sm text-[#94A3B8]">厂家数量</div>
                 <div className="text-3xl font-bold text-white">
-                  {stats.totalVendors}
+                  {stats.totalVendors ?? 0}
                 </div>
-                {stats.pendingVendors > 0 && (
+                {(stats.pendingVendors ?? 0) > 0 && (
                   <div className="mt-2 text-xs text-[#F97316]">
                     {stats.pendingVendors} 家待审核
                   </div>
@@ -164,7 +165,7 @@ export default function AdminDashboard() {
               <div>
                 <div className="text-sm text-[#94A3B8]">用户总数</div>
                 <div className="text-3xl font-bold text-white">
-                  {stats.totalUsers}
+                  {stats.totalUsers ?? 0}
                 </div>
               </div>
               <div className="rounded-full bg-[#8B5CF6]/20 p-3">
@@ -181,7 +182,7 @@ export default function AdminDashboard() {
               <div>
                 <div className="text-sm text-[#94A3B8]">累计收益</div>
                 <div className="text-3xl font-bold text-white">
-                  ¥{stats.totalRevenue.toLocaleString()}
+                  ¥{(stats.totalRevenue ?? 0).toLocaleString()}
                 </div>
               </div>
               <div className="rounded-full bg-[#F97316]/20 p-3">
@@ -191,8 +192,10 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Status Cards */}
+      {stats && (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Online Rate */}
         <Card className="bg-[#1E3A5F] border-[#2D4A6F]">
@@ -201,8 +204,8 @@ export default function AdminDashboard() {
               <div>
                 <div className="text-sm text-[#94A3B8]">设备在线率</div>
                 <div className="text-2xl font-bold text-[#22C55E]">
-                  {stats.totalDevices > 0 
-                    ? Math.round((stats.onlineDevices / stats.totalDevices) * 100) 
+                  {(stats.totalDevices ?? 0) > 0 
+                    ? Math.round(((stats.onlineDevices ?? 0) / stats.totalDevices) * 100) 
                     : 0}%
                 </div>
               </div>
@@ -218,7 +221,7 @@ export default function AdminDashboard() {
               <div>
                 <div className="text-sm text-[#94A3B8]">故障设备</div>
                 <div className="text-2xl font-bold text-[#EF4444]">
-                  {stats.faultDevices}
+                  {stats.faultDevices ?? 0}
                 </div>
               </div>
               <AlertTriangle className="h-8 w-8 text-[#EF4444]" />
@@ -233,7 +236,7 @@ export default function AdminDashboard() {
               <div>
                 <div className="text-sm text-[#94A3B8]">离线设备</div>
                 <div className="text-2xl font-bold text-[#94A3B8]">
-                  {stats.offlineDevices}
+                  {stats.offlineDevices ?? 0}
                 </div>
               </div>
               <Box className="h-8 w-8 text-[#94A3B8]" />
@@ -241,6 +244,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -250,7 +254,7 @@ export default function AdminDashboard() {
             <CardTitle className="text-lg text-white">设备增长趋势</CardTitle>
           </CardHeader>
           <CardContent>
-            {deviceTrend.length > 0 ? (
+            {(deviceTrend?.length ?? 0) > 0 ? (
               <AreaChartComponent
                 data={deviceTrend}
                 dataKey="value"
@@ -271,7 +275,7 @@ export default function AdminDashboard() {
             <CardTitle className="text-lg text-white">收益趋势</CardTitle>
           </CardHeader>
           <CardContent>
-            {revenueTrend.length > 0 ? (
+            {(revenueTrend?.length ?? 0) > 0 ? (
               <AreaChartComponent
                 data={revenueTrend}
                 dataKey="value"
@@ -293,7 +297,7 @@ export default function AdminDashboard() {
           <CardTitle className="text-lg text-white">设备状态分布</CardTitle>
         </CardHeader>
         <CardContent>
-          {deviceDistribution.length > 0 ? (
+          {(deviceDistribution?.length ?? 0) > 0 ? (
             <PieChartComponent data={deviceDistribution} height={300} />
           ) : (
             <div className="h-[300px] flex items-center justify-center text-[#94A3B8]">

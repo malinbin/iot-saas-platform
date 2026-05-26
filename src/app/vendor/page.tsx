@@ -99,8 +99,8 @@ export default function VendorDashboard() {
     );
   }
 
-  const onlineRate = stats.totalDevices > 0 
-    ? Math.round((stats.onlineDevices / stats.totalDevices) * 100) 
+  const onlineRate = (stats?.totalDevices ?? 0) > 0 
+    ? Math.round(((stats?.onlineDevices ?? 0) / stats.totalDevices) * 100) 
     : 0;
 
   return (
@@ -131,6 +131,7 @@ export default function VendorDashboard() {
       </div>
 
       {/* Statistics Cards */}
+      {stats && (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {/* Total Devices */}
         <Card className="border-[#E2E8F0] bg-white shadow-sm hover:shadow-md transition-shadow">
@@ -139,11 +140,11 @@ export default function VendorDashboard() {
               <div>
                 <div className="text-sm text-[#64748B]">设备总数</div>
                 <div className="text-3xl font-bold text-[#1E293B]">
-                  {stats.totalDevices}
+                  {stats.totalDevices ?? 0}
                 </div>
                 <div className="mt-2 flex items-center text-xs text-[#22C55E]">
                   <TrendingUp className="mr-1 h-3 w-3" />
-                  +{stats.monthlyNewDevices} 台本月新增
+                  +{stats.monthlyNewDevices ?? 0} 台本月新增
                 </div>
               </div>
               <div className="rounded-full bg-[#2563EB]/10 p-3">
@@ -214,6 +215,7 @@ export default function VendorDashboard() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -223,7 +225,7 @@ export default function VendorDashboard() {
             <CardTitle className="text-lg text-[#1E293B]">设备数据趋势</CardTitle>
           </CardHeader>
           <CardContent>
-            {trendData.length > 0 ? (
+            {(trendData?.length ?? 0) > 0 ? (
               <AreaChartComponent
                 data={trendData}
                 dataKey="value"
@@ -244,7 +246,7 @@ export default function VendorDashboard() {
             <CardTitle className="text-lg text-[#1E293B]">设备状态分布</CardTitle>
           </CardHeader>
           <CardContent>
-            {deviceDistribution.length > 0 ? (
+            {(deviceDistribution?.length ?? 0) > 0 ? (
               <PieChartComponent data={deviceDistribution} height={250} />
             ) : (
               <div className="h-[250px] flex items-center justify-center text-[#64748B]">
