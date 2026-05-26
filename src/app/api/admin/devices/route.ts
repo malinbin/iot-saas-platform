@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getSystemSettings } from '@/lib/settings';
 
 const supabase = getSupabaseClient();
 
@@ -11,6 +12,10 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const status = searchParams.get('status');
     const vendor_id = searchParams.get('vendor_id');
+
+    // 获取系统设置中的离线阈值
+    const settings = await getSystemSettings();
+    const offlineThresholdMs = settings.offlineThreshold * 60 * 1000;
 
     let query = supabase
       .from('devices')
@@ -54,7 +59,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // 获取每个设备的告警数
+    // 获取每个设备的告警数，并根据设置判断设备状态
+    const now = Date.now();
     const devicesWithAlerts = await Promise.all(
       (devices || []).map(async (device: any) => {
         const { count: alertCount } = await supabase
@@ -63,8 +69,21 @@ export async function GET(request: NextRequest) {
           .eq('device_id', device.id)
           .eq('status', 'active');
         
+        // 根据系统设置判断设备是否离线
+        let computedStatus = device.status;
+        if (device.last_heartbeat_at) {
+          const lastHeartbeat = new Date(device.last_heartbeat_at).getTime();
+          const isOffline = (now - lastHeartbeat) > offlineThresholdMs;
+          if (isOffline && device.status === 'online') {
+            computedStatus = 'offline';
+          }
+        } else {
+          computedStatus = 'offline';
+        }
+        
         return {
           ...device,
+          status: computedStatus,
           template_name: device.device_templates?.name,
           vendor_name: Array.isArray(device.vendors) ? device.vendors[0]?.name : device.vendors?.name,
           alerts: alertCount || 0,

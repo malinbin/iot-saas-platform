@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { getSystemSettings } from '@/lib/settings';
 
 const supabase = getSupabaseClient();
 
@@ -12,6 +13,11 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const level = searchParams.get('level');
     const vendor_id = searchParams.get('vendor_id');
+
+    // 获取系统设置
+    const settings = await getSystemSettings();
+    const escalateMs = settings.faultAutoEscalate * 60 * 1000;
+    const now = Date.now();
 
     let query = supabase
       .from('alerts')
@@ -61,13 +67,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // 格式化数据
-    const formattedAlerts = (alerts || []).map((alert: any) => ({
-      ...alert,
-      device_name: Array.isArray(alert.devices) ? alert.devices[0]?.name : alert.devices?.name,
-      device_serial: Array.isArray(alert.devices) ? alert.devices[0]?.serial_number : alert.devices?.serial_number,
-      vendor_name: Array.isArray(alert.vendors) ? alert.vendors[0]?.name : alert.vendors?.name,
-    }));
+    // 格式化数据，添加自动升级标志
+    const formattedAlerts = (alerts || []).map((alert: any) => {
+      // 判断是否需要自动升级
+      const createdTime = new Date(alert.created_at).getTime();
+      const shouldEscalate = alert.status === 'active' && (now - createdTime) > escalateMs;
+      
+      return {
+        ...alert,
+        device_name: Array.isArray(alert.devices) ? alert.devices[0]?.name : alert.devices?.name,
+        device_serial: Array.isArray(alert.devices) ? alert.devices[0]?.serial_number : alert.devices?.serial_number,
+        vendor_name: Array.isArray(alert.vendors) ? alert.vendors[0]?.name : alert.vendors?.name,
+        should_escalate: shouldEscalate, // 是否需要自动升级
+        auto_sms_enabled: settings.autoSmsAlert, // 是否启用短信告警
+      };
+    });
 
     return NextResponse.json({ 
       success: true, 

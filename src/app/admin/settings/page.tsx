@@ -25,6 +25,7 @@ import {
   EyeOff,
   Copy,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -91,10 +92,17 @@ export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [showApiSecret, setShowApiSecret] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; action: () => void; title: string }>({
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    action: () => void;
+    variant?: 'default' | 'danger';
+  }>({
     open: false,
-    action: () => {},
     title: '',
+    description: '',
+    action: () => {},
   });
 
   // 加载设置
@@ -140,7 +148,7 @@ export default function AdminSettingsPage() {
         setSettings(updatedSettings);
         toast({
           title: '保存成功',
-          description: `${section}设置已保存`,
+          description: `${section}设置已成功保存并生效`,
         });
       } else {
         throw new Error(data.error);
@@ -157,6 +165,21 @@ export default function AdminSettingsPage() {
     }
   };
 
+  // 带确认对话框的保存
+  const handleSaveWithConfirm = (
+    section: string, 
+    newSettings: Partial<SystemSettings>,
+    description?: string
+  ) => {
+    setConfirmDialog({
+      open: true,
+      title: `保存${section}设置`,
+      description: description || `确定要保存${section}的修改吗？修改后将立即生效。`,
+      action: () => saveSettings(section, newSettings),
+      variant: 'default',
+    });
+  };
+
   const generateApiKey = () => {
     const key = 'sk_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     const secret = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -167,10 +190,12 @@ export default function AdminSettingsPage() {
     setConfirmDialog({
       open: true,
       title: '重新生成API密钥',
+      description: '此操作将使旧密钥失效，已使用旧密钥的应用需要更新配置。确定要继续吗？',
       action: () => {
         const newKeys = generateApiKey();
         saveSettings('API密钥', newKeys);
       },
+      variant: 'danger',
     });
   };
 
@@ -196,7 +221,7 @@ export default function AdminSettingsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-white">系统设置</h1>
-          <p className="text-sm text-[#94A3B8]">配置平台全局参数</p>
+          <p className="text-sm text-[#94A3B8]">配置平台全局参数，修改后立即生效</p>
         </div>
         <Button variant="outline" onClick={loadSettings} className="border-[#1E3A5F] text-white">
           <RefreshCw className="mr-2 h-4 w-4" />
@@ -212,7 +237,7 @@ export default function AdminSettingsPage() {
               <Globe className="h-5 w-5 text-[#2563EB]" />
               <div>
                 <CardTitle className="text-lg text-white">平台信息</CardTitle>
-                <CardDescription className="text-[#94A3B8]">设置平台基本信息</CardDescription>
+                <CardDescription className="text-[#94A3B8]">设置平台基本信息，将显示在登录页和通知邮件中</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -252,12 +277,12 @@ export default function AdminSettingsPage() {
               </div>
             </div>
             <Button 
-              onClick={() => saveSettings('平台信息', {
+              onClick={() => handleSaveWithConfirm('平台信息', {
                 platformName: settings.platformName,
                 platformDomain: settings.platformDomain,
                 supportEmail: settings.supportEmail,
                 supportPhone: settings.supportPhone,
-              })}
+              }, '平台信息将显示在登录页面、邮件通知和系统各处。确定要保存吗？')}
               disabled={saving === '平台信息'}
               className="bg-[#2563EB] hover:bg-[#1D4ED8]"
             >
@@ -274,61 +299,49 @@ export default function AdminSettingsPage() {
               <Bell className="h-5 w-5 text-[#2563EB]" />
               <div>
                 <CardTitle className="text-lg text-white">告警规则</CardTitle>
-                <CardDescription className="text-[#94A3B8]">配置全局告警触发规则</CardDescription>
+                <CardDescription className="text-[#94A3B8]">配置全局告警触发规则，影响所有设备的告警判定</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
               <div>
-                <label className="text-sm font-medium text-white">设备离线阈值</label>
-                <Select 
-                  value={String(settings.offlineThreshold)}
-                  onValueChange={(v) => setSettings({ ...settings, offlineThreshold: Number(v) })}
-                >
-                  <SelectTrigger className="mt-1 border-[#1E3A5F] bg-[#0A1628] text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10分钟</SelectItem>
-                    <SelectItem value="30">30分钟</SelectItem>
-                    <SelectItem value="60">1小时</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium text-white">设备离线阈值（分钟）</label>
+                <Input 
+                  type="number"
+                  value={settings.offlineThreshold}
+                  onChange={(e) => setSettings({ ...settings, offlineThreshold: parseInt(e.target.value) || 30 })}
+                  className="mt-1 border-[#1E3A5F] bg-[#0A1628] text-white" 
+                />
+                <p className="text-xs text-[#94A3B8] mt-1">超过此时间未上报数据视为离线</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-white">故障自动升级</label>
-                <Select 
-                  value={String(settings.faultAutoEscalate)}
-                  onValueChange={(v) => setSettings({ ...settings, faultAutoEscalate: Number(v) })}
-                >
-                  <SelectTrigger className="mt-1 border-[#1E3A5F] bg-[#0A1628] text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="30">30分钟</SelectItem>
-                    <SelectItem value="60">1小时</SelectItem>
-                    <SelectItem value="120">2小时</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium text-white">故障自动升级时间（分钟）</label>
+                <Input 
+                  type="number"
+                  value={settings.faultAutoEscalate}
+                  onChange={(e) => setSettings({ ...settings, faultAutoEscalate: parseInt(e.target.value) || 60 })}
+                  className="mt-1 border-[#1E3A5F] bg-[#0A1628] text-white" 
+                />
+                <p className="text-xs text-[#94A3B8] mt-1">未处理的故障自动升级时间</p>
               </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium text-white">自动发送短信告警</div>
-                <div className="text-sm text-[#94A3B8]">高优先级告警自动短信通知</div>
+              <div className="flex items-center justify-between pt-6">
+                <div>
+                  <label className="text-sm font-medium text-white">自动短信告警</label>
+                  <p className="text-xs text-[#94A3B8]">严重告警自动发送短信</p>
+                </div>
+                <Switch
+                  checked={settings.autoSmsAlert}
+                  onCheckedChange={(checked) => setSettings({ ...settings, autoSmsAlert: checked })}
+                />
               </div>
-              <Switch 
-                checked={settings.autoSmsAlert}
-                onCheckedChange={(checked) => setSettings({ ...settings, autoSmsAlert: checked })}
-              />
             </div>
             <Button 
-              onClick={() => saveSettings('告警规则', {
+              onClick={() => handleSaveWithConfirm('告警规则', {
                 offlineThreshold: settings.offlineThreshold,
                 faultAutoEscalate: settings.faultAutoEscalate,
                 autoSmsAlert: settings.autoSmsAlert,
-              })}
+              }, '告警规则修改后，将立即影响所有设备的告警判定逻辑。确定要保存吗？')}
               disabled={saving === '告警规则'}
               className="bg-[#2563EB] hover:bg-[#1D4ED8]"
             >
@@ -345,68 +358,58 @@ export default function AdminSettingsPage() {
               <Shield className="h-5 w-5 text-[#2563EB]" />
               <div>
                 <CardTitle className="text-lg text-white">安全配置</CardTitle>
-                <CardDescription className="text-[#94A3B8]">配置平台安全策略</CardDescription>
+                <CardDescription className="text-[#94A3B8]">配置登录安全和访问控制策略</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="text-sm font-medium text-white">登录失败锁定</label>
-                <Select 
-                  value={String(settings.loginFailLock)}
-                  onValueChange={(v) => setSettings({ ...settings, loginFailLock: Number(v) })}
-                >
-                  <SelectTrigger className="mt-1 border-[#1E3A5F] bg-[#0A1628] text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3">3次</SelectItem>
-                    <SelectItem value="5">5次</SelectItem>
-                    <SelectItem value="10">10次</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium text-white">登录失败锁定次数</label>
+                <Input 
+                  type="number"
+                  value={settings.loginFailLock}
+                  onChange={(e) => setSettings({ ...settings, loginFailLock: parseInt(e.target.value) || 5 })}
+                  className="mt-1 border-[#1E3A5F] bg-[#0A1628] text-white" 
+                />
+                <p className="text-xs text-[#94A3B8] mt-1">连续失败次数后锁定账户</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-white">会话超时</label>
-                <Select 
-                  value={String(settings.sessionTimeout)}
-                  onValueChange={(v) => setSettings({ ...settings, sessionTimeout: Number(v) })}
-                >
-                  <SelectTrigger className="mt-1 border-[#1E3A5F] bg-[#0A1628] text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="30">30分钟</SelectItem>
-                    <SelectItem value="60">1小时</SelectItem>
-                    <SelectItem value="120">2小时</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium text-white">会话超时时间（分钟）</label>
+                <Input 
+                  type="number"
+                  value={settings.sessionTimeout}
+                  onChange={(e) => setSettings({ ...settings, sessionTimeout: parseInt(e.target.value) || 120 })}
+                  className="mt-1 border-[#1E3A5F] bg-[#0A1628] text-white" 
+                />
+                <p className="text-xs text-[#94A3B8] mt-1">无操作自动退出时间</p>
               </div>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium text-white">强制双因素认证</div>
-                <div className="text-sm text-[#94A3B8]">所有管理员必须开启双因素认证</div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-white">强制双因素认证</label>
+                  <p className="text-xs text-[#94A3B8]">要求所有用户启用双因素认证</p>
+                </div>
+                <Switch
+                  checked={settings.forceTwoFactor}
+                  onCheckedChange={(checked) => setSettings({ ...settings, forceTwoFactor: checked })}
+                />
               </div>
-              <Switch 
-                checked={settings.forceTwoFactor}
-                onCheckedChange={(checked) => setSettings({ ...settings, forceTwoFactor: checked })}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium text-white">IP白名单</div>
-                <div className="text-sm text-[#94A3B8]">仅允许白名单IP访问管理后台</div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-sm font-medium text-white">启用IP白名单</label>
+                  <p className="text-xs text-[#94A3B8]">仅允许白名单IP访问</p>
+                </div>
+                <Switch
+                  checked={settings.ipWhitelist}
+                  onCheckedChange={(checked) => setSettings({ ...settings, ipWhitelist: checked })}
+                />
               </div>
-              <Switch 
-                checked={settings.ipWhitelist}
-                onCheckedChange={(checked) => setSettings({ ...settings, ipWhitelist: checked })}
-              />
             </div>
             {settings.ipWhitelist && (
               <div>
-                <label className="text-sm font-medium text-white">白名单IP列表</label>
+                <label className="text-sm font-medium text-white">IP白名单</label>
                 <Input 
                   value={settings.ipWhitelistValues}
                   onChange={(e) => setSettings({ ...settings, ipWhitelistValues: e.target.value })}
@@ -416,13 +419,13 @@ export default function AdminSettingsPage() {
               </div>
             )}
             <Button 
-              onClick={() => saveSettings('安全配置', {
+              onClick={() => handleSaveWithConfirm('安全配置', {
                 loginFailLock: settings.loginFailLock,
                 sessionTimeout: settings.sessionTimeout,
                 forceTwoFactor: settings.forceTwoFactor,
                 ipWhitelist: settings.ipWhitelist,
                 ipWhitelistValues: settings.ipWhitelistValues,
-              })}
+              }, '安全配置修改后，将立即影响所有用户的登录和访问策略。确定要保存吗？')}
               disabled={saving === '安全配置'}
               className="bg-[#2563EB] hover:bg-[#1D4ED8]"
             >
@@ -444,56 +447,50 @@ export default function AdminSettingsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-3">
               <div>
-                <label className="text-sm font-medium text-white">默认采集间隔</label>
-                <Select 
-                  value={String(settings.collectInterval)}
-                  onValueChange={(v) => setSettings({ ...settings, collectInterval: Number(v) })}
+                <label className="text-sm font-medium text-white">数据采集间隔（秒）</label>
+                <Select
+                  value={settings.collectInterval.toString()}
+                  onValueChange={(value) => setSettings({ ...settings, collectInterval: parseInt(value) })}
                 >
                   <SelectTrigger className="mt-1 border-[#1E3A5F] bg-[#0A1628] text-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-[#1E3A5F] border-[#1E3A5F]">
                     <SelectItem value="10">10秒</SelectItem>
                     <SelectItem value="30">30秒</SelectItem>
-                    <SelectItem value="60">1分钟</SelectItem>
+                    <SelectItem value="60">60秒</SelectItem>
+                    <SelectItem value="300">5分钟</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium text-white">数据保留时长</label>
-                <Select 
-                  value={String(settings.dataRetention)}
-                  onValueChange={(v) => setSettings({ ...settings, dataRetention: Number(v) })}
-                >
-                  <SelectTrigger className="mt-1 border-[#1E3A5F] bg-[#0A1628] text-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="90">90天</SelectItem>
-                    <SelectItem value="180">180天</SelectItem>
-                    <SelectItem value="365">1年</SelectItem>
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium text-white">数据保留时长（天）</label>
+                <Input 
+                  type="number"
+                  value={settings.dataRetention}
+                  onChange={(e) => setSettings({ ...settings, dataRetention: parseInt(e.target.value) || 365 })}
+                  className="mt-1 border-[#1E3A5F] bg-[#0A1628] text-white" 
+                />
               </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium text-white">自动数据归档</div>
-                <div className="text-sm text-[#94A3B8]">自动归档90天前的数据</div>
+              <div className="flex items-center justify-between pt-6">
+                <div>
+                  <label className="text-sm font-medium text-white">自动归档</label>
+                  <p className="text-xs text-[#94A3B8]">超期数据自动归档</p>
+                </div>
+                <Switch
+                  checked={settings.autoArchive}
+                  onCheckedChange={(checked) => setSettings({ ...settings, autoArchive: checked })}
+                />
               </div>
-              <Switch 
-                checked={settings.autoArchive}
-                onCheckedChange={(checked) => setSettings({ ...settings, autoArchive: checked })}
-              />
             </div>
             <Button 
-              onClick={() => saveSettings('数据配置', {
+              onClick={() => handleSaveWithConfirm('数据配置', {
                 collectInterval: settings.collectInterval,
                 dataRetention: settings.dataRetention,
                 autoArchive: settings.autoArchive,
-              })}
+              }, '数据配置修改后，将影响系统的数据采集和存储策略。确定要保存吗？')}
               disabled={saving === '数据配置'}
               className="bg-[#2563EB] hover:bg-[#1D4ED8]"
             >
@@ -510,7 +507,7 @@ export default function AdminSettingsPage() {
               <Key className="h-5 w-5 text-[#2563EB]" />
               <div>
                 <CardTitle className="text-lg text-white">API密钥管理</CardTitle>
-                <CardDescription className="text-[#94A3B8]">管理平台API访问密钥</CardDescription>
+                <CardDescription className="text-[#94A3B8]">管理平台API访问密钥，用于第三方系统集成</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -584,9 +581,12 @@ export default function AdminSettingsPage() {
       <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}>
         <DialogContent className="border-[#1E3A5F] bg-[#1E3A5F]">
           <DialogHeader>
-            <DialogTitle className="text-white">{confirmDialog.title}</DialogTitle>
+            <DialogTitle className="text-white flex items-center gap-2">
+              {confirmDialog.variant === 'danger' && <AlertTriangle className="h-5 w-5 text-[#F97316]" />}
+              {confirmDialog.title}
+            </DialogTitle>
             <DialogDescription className="text-[#94A3B8]">
-              此操作将使旧密钥失效，已使用旧密钥的应用需要更新配置。确定要继续吗？
+              {confirmDialog.description}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -602,7 +602,7 @@ export default function AdminSettingsPage() {
                 confirmDialog.action();
                 setConfirmDialog({ ...confirmDialog, open: false });
               }}
-              className="bg-[#2563EB] hover:bg-[#1D4ED8]"
+              className={confirmDialog.variant === 'danger' ? 'bg-[#EF4444] hover:bg-[#DC2626]' : 'bg-[#2563EB] hover:bg-[#1D4ED8]'}
             >
               确定
             </Button>
