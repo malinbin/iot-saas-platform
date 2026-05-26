@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { AlertTriangle, RefreshCw, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -20,256 +20,178 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertTriangle, Search, Bell, Clock, CheckCircle } from 'lucide-react';
 
 interface Alert {
   id: string;
   deviceName: string;
-  deviceSn: string;
-  type: 'fault' | 'warning' | 'offline';
+  deviceCode: string;
+  level: string;
+  type: string;
   message: string;
-  level: 'high' | 'medium' | 'low';
-  status: 'pending' | 'processing' | 'resolved';
+  status: string;
   createdAt: string;
 }
 
-const mockAlerts: Alert[] = [
-  {
-    id: '1',
-    deviceName: 'CNC加工中心-01',
-    deviceSn: 'SN202401001',
-    type: 'fault',
-    message: '主轴温度过高，超过85°C',
-    level: 'high',
-    status: 'pending',
-    createdAt: '2024-01-15 14:30:00',
-  },
-  {
-    id: '2',
-    deviceName: '激光切割机-03',
-    deviceSn: 'SN202401015',
-    type: 'warning',
-    message: '激光功率下降15%，建议检查镜片',
-    level: 'medium',
-    status: 'processing',
-    createdAt: '2024-01-15 13:45:00',
-  },
-  {
-    id: '3',
-    deviceName: '注塑机-02',
-    deviceSn: 'SN202401008',
-    type: 'offline',
-    message: '设备离线超过30分钟',
-    level: 'low',
-    status: 'pending',
-    createdAt: '2024-01-15 12:00:00',
-  },
-  {
-    id: '4',
-    deviceName: '冲压机-01',
-    deviceSn: 'SN202401012',
-    type: 'fault',
-    message: '液压系统压力异常',
-    level: 'high',
-    status: 'resolved',
-    createdAt: '2024-01-15 10:20:00',
-  },
-];
-
-const levelColors = {
-  high: 'bg-[#FEE2E2] text-[#DC2626]',
-  medium: 'bg-[#FEF3C7] text-[#D97706]',
-  low: 'bg-[#DBEAFE] text-[#2563EB]',
-};
-
-const statusColors = {
-  pending: 'bg-[#FEE2E2] text-[#DC2626]',
-  processing: 'bg-[#FEF3C7] text-[#D97706]',
-  resolved: 'bg-[#DCFCE7] text-[#16A34A]',
-};
-
-const typeIcons = {
-  fault: '🔴',
-  warning: '🟡',
-  offline: '⚫',
-};
-
 export default function VendorAlertsPage() {
-  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [levelFilter, setLevelFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [alerts] = useState<Alert[]>(mockAlerts);
 
-  const filteredAlerts = alerts.filter(a => {
-    const matchSearch = a.deviceName.includes(search) || a.message.includes(search);
-    const matchLevel = levelFilter === 'all' || a.level === levelFilter;
-    const matchStatus = statusFilter === 'all' || a.status === statusFilter;
-    return matchSearch && matchLevel && matchStatus;
+  const fetchAlerts = async () => {
+    try {
+      const response = await fetch('/api/vendor/alerts');
+      const result = await response.json();
+      
+      if (result.success) {
+        setAlerts(result.data);
+      }
+    } catch (error) {
+      console.error('Fetch alerts error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAlerts();
+  }, []);
+
+  const filteredAlerts = alerts.filter(alert => {
+    if (levelFilter === 'all') return true;
+    return alert.level === levelFilter;
   });
 
-  const stats = {
-    total: alerts.length,
-    pending: alerts.filter(a => a.status === 'pending').length,
-    high: alerts.filter(a => a.level === 'high').length,
-    resolved: alerts.filter(a => a.status === 'resolved').length,
+  const getLevelColor = (level: string) => {
+    switch (level) {
+      case 'critical': return 'bg-[#EF4444]';
+      case 'warning': return 'bg-[#F59E0B]';
+      case 'info': return 'bg-[#3B82F6]';
+      default: return 'bg-[#64748B]';
+    }
   };
+
+  const getLevelBadge = (level: string) => {
+    switch (level) {
+      case 'critical':
+        return <Badge className="bg-[#EF4444]">严重</Badge>;
+      case 'warning':
+        return <Badge className="bg-[#F59E0B]">警告</Badge>;
+      case 'info':
+        return <Badge className="bg-[#3B82F6]">提示</Badge>;
+      default:
+        return <Badge variant="outline">{level}</Badge>;
+    }
+  };
+
+  const handleMarkHandled = async (alertId: string) => {
+    try {
+      // TODO: 调用API标记告警已处理
+      setAlerts(alerts.map(a => 
+        a.id === alertId ? { ...a, status: 'handled' } : a
+      ));
+    } catch (error) {
+      console.error('Mark handled error:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="h-8 w-8 animate-spin text-[#2563EB]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-[#1E293B]">告警中心</h1>
-          <p className="text-sm text-[#64748B]">管理旗下设备的告警信息</p>
+          <h1 className="text-2xl font-bold text-[#1E293B]">告警中心</h1>
+          <p className="text-sm text-[#64748B]">
+            共 {alerts.length} 条告警
+          </p>
         </div>
-        <Button className="bg-[#2563EB] hover:bg-[#1D4ED8]">
-          <Bell className="mr-2 h-4 w-4" />
-          全部已读
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={levelFilter} onValueChange={setLevelFilter}>
+            <SelectTrigger className="w-32">
+              <SelectValue placeholder="告警级别" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部</SelectItem>
+              <SelectItem value="critical">严重</SelectItem>
+              <SelectItem value="warning">警告</SelectItem>
+              <SelectItem value="info">提示</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={fetchAlerts} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            刷新
+          </Button>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border-[#E2E8F0]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#64748B]">总告警数</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#1E293B]">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-[#E2E8F0]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#64748B]">待处理</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#DC2626]">{stats.pending}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-[#E2E8F0]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#64748B]">高优先级</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#F97316]">{stats.high}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-[#E2E8F0]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#64748B]">已解决</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#22C55E]">{stats.resolved}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filter */}
-      <Card className="border-[#E2E8F0]">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
-              <Input
-                placeholder="搜索设备名称或告警内容..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
+      {/* Alert Table */}
+      <Card className="border-[#E2E8F0] bg-white">
+        <CardHeader>
+          <CardTitle className="text-lg text-[#1E293B]">告警列表</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {filteredAlerts.length === 0 ? (
+            <div className="text-center py-10 text-[#64748B]">
+              <AlertTriangle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>暂无告警数据</p>
             </div>
-            <Select value={levelFilter} onValueChange={setLevelFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="告警级别" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部级别</SelectItem>
-                <SelectItem value="high">高</SelectItem>
-                <SelectItem value="medium">中</SelectItem>
-                <SelectItem value="low">低</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="处理状态" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部状态</SelectItem>
-                <SelectItem value="pending">待处理</SelectItem>
-                <SelectItem value="processing">处理中</SelectItem>
-                <SelectItem value="resolved">已解决</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Table */}
-      <Card className="border-[#E2E8F0]">
-        <CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>告警信息</TableHead>
-                <TableHead>设备</TableHead>
-                <TableHead>级别</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>时间</TableHead>
-                <TableHead className="text-right">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAlerts.map((alert) => (
-                <TableRow key={alert.id}>
-                  <TableCell>
-                    <div className="flex items-start gap-3">
-                      <span className="text-lg">{typeIcons[alert.type]}</span>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>设备</TableHead>
+                  <TableHead>告警级别</TableHead>
+                  <TableHead>告警类型</TableHead>
+                  <TableHead>告警信息</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead>时间</TableHead>
+                  <TableHead>操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredAlerts.map((alert) => (
+                  <TableRow key={alert.id}>
+                    <TableCell>
                       <div>
-                        <div className="font-medium text-[#1E293B]">{alert.message}</div>
-                        <div className="text-sm text-[#64748B]">
-                          {alert.type === 'fault' ? '故障' : alert.type === 'warning' ? '警告' : '离线'}
-                        </div>
+                        <div className="font-medium">{alert.deviceName}</div>
+                        <div className="text-xs text-[#64748B]">{alert.deviceCode}</div>
                       </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div className="font-medium text-[#1E293B]">{alert.deviceName}</div>
-                      <div className="text-[#64748B]">{alert.deviceSn}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={levelColors[alert.level]}>
-                      {alert.level === 'high' ? '高' : alert.level === 'medium' ? '中' : '低'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={statusColors[alert.status]}>
-                      {alert.status === 'pending' ? '待处理' : 
-                       alert.status === 'processing' ? '处理中' : '已解决'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 text-sm text-[#64748B]">
-                      <Clock className="h-3 w-3" />
-                      {alert.createdAt}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {alert.status !== 'resolved' && (
-                        <Button variant="ghost" size="sm" className="text-[#22C55E]">
-                          <CheckCircle className="h-4 w-4" />
+                    </TableCell>
+                    <TableCell>{getLevelBadge(alert.level)}</TableCell>
+                    <TableCell>{alert.type}</TableCell>
+                    <TableCell>{alert.message}</TableCell>
+                    <TableCell>
+                      <Badge variant={alert.status === 'active' ? 'destructive' : 'outline'}>
+                        {alert.status === 'active' ? '未处理' : '已处理'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-[#64748B]">
+                      {new Date(alert.createdAt).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      {alert.status === 'active' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleMarkHandled(alert.id)}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          处理
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm" className="text-[#2563EB]">
-                        详情
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

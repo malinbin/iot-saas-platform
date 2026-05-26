@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Users, RefreshCw, Search, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -13,297 +14,155 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { 
-  Users, 
-  Search, 
-  Plus, 
-  UserCog,
-  Shield,
-  Clock,
-} from 'lucide-react';
 
 interface User {
   id: string;
   name: string;
-  email: string;
   phone: string;
-  role: 'admin' | 'vendor' | 'user';
-  vendorName?: string;
-  status: 'active' | 'inactive' | 'pending';
-  lastLogin: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  expiresAt: string | null;
   createdAt: string;
+  vendor?: {
+    name: string;
+  };
 }
 
-const mockUsers: User[] = [
-  {
-    id: '1',
-    name: '超级管理员',
-    email: 'admin@iot.com',
-    phone: '138****0001',
-    role: 'admin',
-    status: 'active',
-    lastLogin: '2024-01-15 14:30',
-    createdAt: '2023-01-01',
-  },
-  {
-    id: '2',
-    name: '智联科技',
-    email: 'vendor@zhilian.com',
-    phone: '138****5678',
-    role: 'vendor',
-    vendorName: '智联科技有限公司',
-    status: 'active',
-    lastLogin: '2024-01-15 13:20',
-    createdAt: '2024-01-10',
-  },
-  {
-    id: '3',
-    name: '华东机械',
-    email: 'vendor@huadong.com',
-    phone: '139****1234',
-    role: 'vendor',
-    vendorName: '华东机械制造厂',
-    status: 'active',
-    lastLogin: '2024-01-15 10:15',
-    createdAt: '2024-01-08',
-  },
-  {
-    id: '4',
-    name: '张经理',
-    email: 'zhang@huadong.com',
-    phone: '137****5678',
-    role: 'user',
-    vendorName: '华东机械制造厂',
-    status: 'active',
-    lastLogin: '2024-01-15 09:30',
-    createdAt: '2024-01-12',
-  },
-];
-
-const roleColors = {
-  admin: 'bg-[#FEE2E2] text-[#DC2626]',
-  vendor: 'bg-[#DBEAFE] text-[#2563EB]',
-  user: 'bg-[#DCFCE7] text-[#16A34A]',
-};
-
-const roleLabels = {
-  admin: '超级管理员',
-  vendor: '厂家',
-  user: '终端用户',
-};
-
 export default function AdminUsersPage() {
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('all');
-  const [users] = useState<User[]>(mockUsers);
 
-  const filteredUsers = users.filter(u => {
-    const matchSearch = u.name.includes(search) || u.email.includes(search);
-    const matchRole = roleFilter === 'all' || u.role === roleFilter;
-    return matchSearch && matchRole;
-  });
-
-  const stats = {
-    total: users.length,
-    admins: users.filter(u => u.role === 'admin').length,
-    vendors: users.filter(u => u.role === 'vendor').length,
-    users: users.filter(u => u.role === 'user').length,
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch('/api/admin/users');
+      const result = await response.json();
+      
+      if (result.success) {
+        setUsers(result.data);
+      }
+    } catch (error) {
+      console.error('Fetch users error:', error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const isExpired = (expiresAt: string | null) => {
+    if (!expiresAt) return false;
+    return new Date(expiresAt) < new Date();
+  };
+
+  const getExpiresText = (expiresAt: string | null) => {
+    if (!expiresAt) return '永久有效';
+    const date = new Date(expiresAt);
+    if (date < new Date()) return '已过期';
+    return date.toLocaleDateString();
+  };
+
+  const filteredUsers = users.filter(user => 
+    user.name.toLowerCase().includes(search.toLowerCase()) ||
+    user.phone?.includes(search) ||
+    user.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="h-8 w-8 animate-spin text-[#22C55E]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">用户管理</h1>
-          <p className="text-sm text-[#94A3B8]">管理平台所有用户账户</p>
+          <h1 className="text-2xl font-bold text-white">用户管理</h1>
+          <p className="text-sm text-[#94A3B8]">
+            共 {users.length} 个用户
+          </p>
         </div>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button className="bg-[#2563EB] hover:bg-[#1D4ED8]">
-              <Plus className="mr-2 h-4 w-4" />
-              添加用户
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>添加新用户</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <div>
-                <label className="text-sm font-medium">用户名</label>
-                <Input placeholder="请输入用户名" className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">邮箱</label>
-                <Input placeholder="请输入邮箱" className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">手机号</label>
-                <Input placeholder="请输入手机号" className="mt-1" />
-              </div>
-              <div>
-                <label className="text-sm font-medium">角色</label>
-                <Select defaultValue="user">
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">超级管理员</SelectItem>
-                    <SelectItem value="vendor">厂家</SelectItem>
-                    <SelectItem value="user">终端用户</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button className="w-full bg-[#2563EB] hover:bg-[#1D4ED8]">
-                创建用户
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button 
+          onClick={fetchUsers}
+          className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/80 text-white"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          刷新
+        </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border-[#1E3A5F] bg-[#1E3A5F]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#94A3B8]">总用户数</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-[#1E3A5F] bg-[#1E3A5F]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#94A3B8]">管理员</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#EF4444]">{stats.admins}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-[#1E3A5F] bg-[#1E3A5F]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#94A3B8]">厂家</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#2563EB]">{stats.vendors}</div>
-          </CardContent>
-        </Card>
-        <Card className="border-[#1E3A5F] bg-[#1E3A5F]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-[#94A3B8]">终端用户</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[#22C55E]">{stats.users}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filter */}
-      <Card className="border-[#1E3A5F] bg-[#1E3A5F]">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
+      {/* User Table */}
+      <Card className="bg-[#1E3A5F] border-[#2D4A6F]">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg text-white">用户列表</CardTitle>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#94A3B8]" />
               <Input
-                placeholder="搜索用户名或邮箱..."
+                placeholder="搜索用户..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="border-[#1E3A5F] bg-[#0A1628] pl-10 text-white placeholder:text-[#64748B]"
+                className="pl-9 bg-[#0A1628] border-[#2D4A6F] text-white"
               />
             </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[150px] border-[#1E3A5F] bg-[#0A1628] text-white">
-                <SelectValue placeholder="角色筛选" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部角色</SelectItem>
-                <SelectItem value="admin">管理员</SelectItem>
-                <SelectItem value="vendor">厂家</SelectItem>
-                <SelectItem value="user">终端用户</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Table */}
-      <Card className="border-[#1E3A5F] bg-[#1E3A5F]">
-        <CardContent className="pt-6">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-[#1E3A5F] hover:bg-transparent">
-                <TableHead className="text-[#94A3B8]">用户信息</TableHead>
-                <TableHead className="text-[#94A3B8]">角色</TableHead>
-                <TableHead className="text-[#94A3B8]">所属厂家</TableHead>
-                <TableHead className="text-[#94A3B8]">状态</TableHead>
-                <TableHead className="text-[#94A3B8]">最后登录</TableHead>
-                <TableHead className="text-right text-[#94A3B8]">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id} className="border-[#1E3A5F]">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#2563EB]/20">
-                        <Users className="h-5 w-5 text-[#2563EB]" />
-                      </div>
-                      <div>
-                        <div className="font-medium text-white">{user.name}</div>
-                        <div className="text-sm text-[#94A3B8]">{user.email}</div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={roleColors[user.role]}>
-                      {roleLabels[user.role]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-[#94A3B8]">
-                    {user.vendorName || '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={user.status === 'active' ? 'default' : 'secondary'}
-                      className={user.status === 'active' ? 'bg-[#DCFCE7] text-[#16A34A]' : ''}
-                    >
-                      {user.status === 'active' ? '正常' : '禁用'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 text-sm text-[#94A3B8]">
-                      <Clock className="h-3 w-3" />
-                      {user.lastLogin}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="sm" className="text-[#2563EB]">
-                        <UserCog className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-[#2563EB]">
-                        <Shield className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
+        </CardHeader>
+        <CardContent>
+          {filteredUsers.length === 0 ? (
+            <div className="text-center py-10 text-[#94A3B8]">
+              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>{search ? '未找到匹配的用户' : '暂无用户数据'}</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-[#2D4A6F] hover:bg-[#2D4A6F]/50">
+                  <TableHead className="text-[#94A3B8]">用户名称</TableHead>
+                  <TableHead className="text-[#94A3B8]">联系电话</TableHead>
+                  <TableHead className="text-[#94A3B8]">邮箱</TableHead>
+                  <TableHead className="text-[#94A3B8]">所属厂家</TableHead>
+                  <TableHead className="text-[#94A3B8]">状态</TableHead>
+                  <TableHead className="text-[#94A3B8]">到期时间</TableHead>
+                  <TableHead className="text-[#94A3B8]">创建时间</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id} className="border-[#2D4A6F] hover:bg-[#2D4A6F]/50">
+                    <TableCell className="font-medium text-white">{user.name}</TableCell>
+                    <TableCell className="text-[#94A3B8]">{user.phone || '-'}</TableCell>
+                    <TableCell className="text-[#94A3B8]">{user.email || '-'}</TableCell>
+                    <TableCell className="text-[#94A3B8]">{user.vendor?.name || '-'}</TableCell>
+                    <TableCell>
+                      {user.isActive && !isExpired(user.expiresAt) ? (
+                        <Badge className="bg-[#22C55E]">正常</Badge>
+                      ) : (
+                        <Badge className="bg-[#EF4444]">已禁用</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        <span className={isExpired(user.expiresAt) ? 'text-[#EF4444]' : 'text-[#94A3B8]'}>
+                          {getExpiresText(user.expiresAt)}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-[#94A3B8]">
+                      {new Date(user.createdAt).toLocaleDateString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

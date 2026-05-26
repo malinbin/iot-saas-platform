@@ -1,19 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import {
-  Search,
-  Filter,
-  MoreHorizontal,
-  Box,
-  Activity,
-  AlertTriangle,
-  Download,
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Box, RefreshCw, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -22,223 +14,143 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { generateVendors, generateDevices } from '@/lib/mock-data';
 
-export default function DevicesPage() {
-  const vendors = generateVendors();
-  const devices = generateDevices(100, vendors);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+interface Device {
+  id: string;
+  name: string;
+  deviceCode: string;
+  status: string;
+  location: string;
+  createdAt: string;
+  template?: {
+    name: string;
+  };
+  vendor?: {
+    name: string;
+  };
+}
 
-  // 筛选设备
-  const filteredDevices = devices.filter((device) => {
-    const matchesSearch =
-      device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      device.vendorName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      statusFilter === 'all' || device.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+export default function AdminDevicesPage() {
+  const [loading, setLoading] = useState(true);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [search, setSearch] = useState('');
 
-  // 统计数据
-  const totalDevices = devices.length;
-  const onlineDevices = devices.filter((d) => d.status === 'online').length;
-  const offlineDevices = devices.filter((d) => d.status === 'offline').length;
-  const faultDevices = devices.filter((d) => d.status === 'fault').length;
+  const fetchDevices = async () => {
+    try {
+      const response = await fetch('/api/admin/devices');
+      const result = await response.json();
+      
+      if (result.success) {
+        setDevices(result.data);
+      }
+    } catch (error) {
+      console.error('Fetch devices error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDevices();
+  }, []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'online':
-        return (
-          <Badge className="bg-[#22C55E]/20 text-[#22C55E] border-0">
-            在线
-          </Badge>
-        );
+        return <Badge className="bg-[#22C55E]">在线</Badge>;
       case 'offline':
-        return (
-          <Badge className="bg-[#64748B]/20 text-[#64748B] border-0">
-            离线
-          </Badge>
-        );
+        return <Badge className="bg-[#94A3B8]">离线</Badge>;
       case 'fault':
-        return (
-          <Badge className="bg-[#EF4444]/20 text-[#EF4444] border-0">
-            故障
-          </Badge>
-        );
-      case 'warning':
-        return (
-          <Badge className="bg-[#F97316]/20 text-[#F97316] border-0">
-            告警
-          </Badge>
-        );
+        return <Badge className="bg-[#EF4444]">故障</Badge>;
       default:
-        return null;
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
+  const filteredDevices = devices.filter(device => 
+    device.name.toLowerCase().includes(search.toLowerCase()) ||
+    device.deviceCode?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="h-8 w-8 animate-spin text-[#22C55E]" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Page Header */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">设备管理</h1>
-          <p className="text-sm text-[#64748B]">
-            查看和管理所有接入平台的设备
+          <p className="text-sm text-[#94A3B8]">
+            共 {devices.length} 台设备
           </p>
         </div>
-        <Button className="bg-[#2563EB] hover:bg-[#2563EB]/90">
-          <Download className="mr-2 h-4 w-4" />
-          导出设备
+        <Button 
+          onClick={fetchDevices}
+          className="bg-[#1E3A5F] hover:bg-[#1E3A5F]/80 text-white"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          刷新
         </Button>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Card className="border-[#1E3A5F] bg-[#1E3A5F]/30">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-[#94A3B8]">总设备数</div>
-                <div className="text-2xl font-bold text-white">
-                  {totalDevices}
-                </div>
-              </div>
-              <Box className="h-8 w-8 text-[#2563EB]" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-[#1E3A5F] bg-[#1E3A5F]/30">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-[#94A3B8]">在线设备</div>
-                <div className="text-2xl font-bold text-[#22C55E]">
-                  {onlineDevices}
-                </div>
-              </div>
-              <Activity className="h-8 w-8 text-[#22C55E]" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-[#1E3A5F] bg-[#1E3A5F]/30">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-[#94A3B8]">离线设备</div>
-                <div className="text-2xl font-bold text-[#64748B]">
-                  {offlineDevices}
-                </div>
-              </div>
-              <Activity className="h-8 w-8 text-[#64748B]" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-[#1E3A5F] bg-[#1E3A5F]/30">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-[#94A3B8]">故障设备</div>
-                <div className="text-2xl font-bold text-[#EF4444]">
-                  {faultDevices}
-                </div>
-              </div>
-              <AlertTriangle className="h-8 w-8 text-[#EF4444]" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filter Bar */}
-      <Card className="border-[#1E3A5F] bg-[#1E3A5F]/30">
-        <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-1 gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#64748B]" />
-                <Input
-                  placeholder="搜索设备名称或厂家..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="border-[#1E3A5F] bg-[#0A1628] pl-10 text-white placeholder:text-[#64748B]"
-                />
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40 border-[#1E3A5F] bg-[#0A1628] text-white">
-                  <Filter className="mr-2 h-4 w-4 text-[#64748B]" />
-                  <SelectValue placeholder="筛选状态" />
-                </SelectTrigger>
-                <SelectContent className="border-[#1E3A5F] bg-[#0A1628] text-white">
-                  <SelectItem value="all">全部状态</SelectItem>
-                  <SelectItem value="online">在线</SelectItem>
-                  <SelectItem value="offline">离线</SelectItem>
-                  <SelectItem value="fault">故障</SelectItem>
-                  <SelectItem value="warning">告警</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="border-[#1E3A5F] text-[#94A3B8] hover:bg-[#1E3A5F] hover:text-white"
-              >
-                批量操作
-              </Button>
+      {/* Device Table */}
+      <Card className="bg-[#1E3A5F] border-[#2D4A6F]">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg text-white">设备列表</CardTitle>
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#94A3B8]" />
+              <Input
+                placeholder="搜索设备..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 bg-[#0A1628] border-[#2D4A6F] text-white"
+              />
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Devices Table */}
-      <Card className="border-[#1E3A5F] bg-[#1E3A5F]/30">
-        <CardHeader>
-          <CardTitle className="text-white">
-            设备列表（共 {filteredDevices.length} 台）
-          </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-[#1E3A5F] hover:bg-[#0A1628]">
-                <TableHead className="text-[#64748B]">设备名称</TableHead>
-                <TableHead className="text-[#64748B]">型号</TableHead>
-                <TableHead className="text-[#64748B]">厂家</TableHead>
-                <TableHead className="text-[#64748B]">位置</TableHead>
-                <TableHead className="text-[#64748B]">状态</TableHead>
-                <TableHead className="text-[#64748B]">最后在线</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredDevices.slice(0, 20).map((device) => (
-                <TableRow
-                  key={device.id}
-                  className="border-[#1E3A5F] hover:bg-[#0A1628]"
-                >
-                  <TableCell className="font-medium text-white">
-                    {device.name}
-                  </TableCell>
-                  <TableCell className="text-[#94A3B8]">{device.model}</TableCell>
-                  <TableCell className="text-[#94A3B8]">
-                    {device.vendorName}
-                  </TableCell>
-                  <TableCell className="text-[#94A3B8]">
-                    {device.location}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(device.status)}</TableCell>
-                  <TableCell className="text-[#94A3B8]">
-                    {device.lastOnline.toLocaleDateString()}
-                  </TableCell>
+          {filteredDevices.length === 0 ? (
+            <div className="text-center py-10 text-[#94A3B8]">
+              <Box className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>{search ? '未找到匹配的设备' : '暂无设备数据'}</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-[#2D4A6F] hover:bg-[#2D4A6F]/50">
+                  <TableHead className="text-[#94A3B8]">设备名称</TableHead>
+                  <TableHead className="text-[#94A3B8]">设备编号</TableHead>
+                  <TableHead className="text-[#94A3B8]">所属厂家</TableHead>
+                  <TableHead className="text-[#94A3B8]">设备模板</TableHead>
+                  <TableHead className="text-[#94A3B8]">位置</TableHead>
+                  <TableHead className="text-[#94A3B8]">状态</TableHead>
+                  <TableHead className="text-[#94A3B8]">创建时间</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredDevices.map((device) => (
+                  <TableRow key={device.id} className="border-[#2D4A6F] hover:bg-[#2D4A6F]/50">
+                    <TableCell className="font-medium text-white">{device.name}</TableCell>
+                    <TableCell className="text-[#94A3B8]">{device.deviceCode || '-'}</TableCell>
+                    <TableCell className="text-[#94A3B8]">{device.vendor?.name || '-'}</TableCell>
+                    <TableCell className="text-[#94A3B8]">{device.template?.name || '-'}</TableCell>
+                    <TableCell className="text-[#94A3B8]">{device.location || '-'}</TableCell>
+                    <TableCell>{getStatusBadge(device.status)}</TableCell>
+                    <TableCell className="text-sm text-[#94A3B8]">
+                      {new Date(device.createdAt).toLocaleDateString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

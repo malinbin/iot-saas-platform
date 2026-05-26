@@ -1,319 +1,246 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  Activity,
-  AlertTriangle,
-  Power,
-  RefreshCw,
-  Settings,
-  Thermometer,
-  Gauge,
-  Zap,
-} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Activity, RefreshCw, Thermometer, Gauge, Zap, Timer, TrendingUp, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { AreaChartComponent } from '@/components/charts';
-import { generateVendors, generateDevices, generateTrendData } from '@/lib/mock-data';
 
-export default function MonitorPage() {
-  const vendors = generateVendors();
-  const devices = generateDevices(20, [vendors[0]]);
-  const [selectedDevice, setSelectedDevice] = useState(devices[0]);
-  const trendData = generateTrendData();
+interface Device {
+  id: string;
+  name: string;
+  device_code: string;
+  status: string;
+  location: string;
+  template?: {
+    id: string;
+    name: string;
+  };
+}
 
-  // 模拟实时数据 - 使用 useState 避免渲染期间的 Math.random
-  const [realtimeData, setRealtimeData] = useState({
-    temperature: 47.5,
-    humidity: 65.0,
-    power: 480,
-    efficiency: 94.0,
-    speed: 3300,
-    pressure: 5.4,
-  });
+interface TemplateField {
+  id: string;
+  field_key: string;
+  field_name: string;
+  unit: string;
+  color: string;
+  chart_type: string;
+  min_value: number | null;
+  max_value: number | null;
+}
 
-  // 模拟数据更新
+export default function VendorMonitorPage() {
+  const [loading, setLoading] = useState(true);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<string>('');
+  const [deviceData, setDeviceData] = useState<any>(null);
+  const [templateFields, setTemplateFields] = useState<TemplateField[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchDevices = async () => {
+    try {
+      const response = await fetch('/api/vendor/monitor');
+      const result = await response.json();
+      
+      if (result.success) {
+        setDevices(result.data);
+        if (result.data.length > 0 && !selectedDevice) {
+          setSelectedDevice(result.data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Fetch devices error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDeviceData = async () => {
+    if (!selectedDevice) return;
+    
+    try {
+      setRefreshing(true);
+      const response = await fetch(`/api/vendor/monitor?deviceId=${selectedDevice}`);
+      const result = await response.json();
+      
+      if (result.success) {
+        setDeviceData(result.data);
+        setTemplateFields(result.data.device?.template?.fields || []);
+      }
+    } catch (error) {
+      console.error('Fetch device data error:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      setRealtimeData({
-        temperature: 45.2 + Math.random() * 5,
-        humidity: 62.5 + Math.random() * 10,
-        power: 456 + Math.random() * 50,
-        efficiency: 92.3 + Math.random() * 5,
-        speed: 3200 + Math.random() * 200,
-        pressure: 5.2 + Math.random() * 0.5,
-      });
-    }, 5000);
-    return () => clearInterval(interval);
+    fetchDevices();
   }, []);
+
+  useEffect(() => {
+    if (selectedDevice) {
+      fetchDeviceData();
+      const interval = setInterval(fetchDeviceData, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [selectedDevice]);
+
+  const getFieldValue = (fieldKey: string) => {
+    return deviceData?.latestData?.[fieldKey] ?? '-';
+  };
+
+  const isFieldAlert = (field: TemplateField) => {
+    const value = deviceData?.latestData?.[field.field_key];
+    if (value === undefined || value === null) return false;
+    
+    if (field.min_value !== null && value < field.min_value) return true;
+    if (field.max_value !== null && value > field.max_value) return true;
+    return false;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <RefreshCw className="h-8 w-8 animate-spin text-[#2563EB]" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[#1E293B]">远程运维</h1>
-          <p className="text-sm text-[#64748B]">
-            实时监控设备运行状态，支持远程控制
+          <h1 className="text-2xl font-bold text-slate-900">远程运维</h1>
+          <p className="text-sm text-slate-500">
+            实时监控设备运行状态
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            刷新数据
+        <div className="flex items-center gap-3">
+          <Select value={selectedDevice} onValueChange={setSelectedDevice}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="选择设备" />
+            </SelectTrigger>
+            <SelectContent>
+              {devices.map((device) => (
+                <SelectItem key={device.id} value={device.id}>
+                  {device.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button 
+            onClick={fetchDeviceData}
+            disabled={refreshing}
+          >
+            {refreshing ? (
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            ) : null}
+            刷新
           </Button>
         </div>
       </div>
 
-      {/* Device Selection */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Device List */}
-        <Card className="border-[#E2E8F0] bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg text-[#1E293B]">设备列表</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {devices.slice(0, 10).map((device) => (
-                <div
-                  key={device.id}
-                  onClick={() => setSelectedDevice(device)}
-                  className={`cursor-pointer rounded-lg border p-3 transition-colors ${
-                    selectedDevice.id === device.id
-                      ? 'border-[#2563EB] bg-[#2563EB]/5'
-                      : 'border-[#E2E8F0] hover:bg-[#F8FAFC]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium text-[#1E293B]">
-                      {device.name}
-                    </div>
-                    <Badge
-                      className={`text-xs ${
-                        device.status === 'online'
-                          ? 'bg-[#22C55E]/10 text-[#22C55E]'
-                          : device.status === 'fault'
-                            ? 'bg-[#EF4444]/10 text-[#EF4444]'
-                            : 'bg-[#94A3B8]/10 text-[#94A3B8]'
-                      }`}
-                    >
-                      {device.status === 'online'
-                        ? '在线'
-                        : device.status === 'fault'
-                          ? '故障'
-                          : '离线'}
-                    </Badge>
-                  </div>
-                  <div className="mt-1 text-xs text-[#64748B]">
-                    {device.model}
-                  </div>
-                </div>
-              ))}
-            </div>
+      {devices.length === 0 ? (
+        <Card>
+          <CardContent className="py-10 text-center text-slate-500">
+            <Activity className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>暂无设备，请先添加设备</p>
           </CardContent>
         </Card>
-
-        {/* Real-time Monitor */}
-        <div className="lg:col-span-2 space-y-6">
+      ) : !deviceData ? (
+        <Card>
+          <CardContent className="py-10 text-center text-slate-500">
+            <RefreshCw className="h-12 w-12 mx-auto mb-4 animate-spin" />
+            <p>加载设备数据...</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
           {/* Device Info */}
-          <Card className="border-[#E2E8F0] bg-white shadow-sm">
+          <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg text-[#1E293B]">
-                    {selectedDevice.name}
-                  </CardTitle>
-                  <div className="text-sm text-[#64748B]">
-                    {selectedDevice.model} · {selectedDevice.location}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    className="bg-[#22C55E] hover:bg-[#22C55E]/90"
-                  >
-                    <Power className="mr-2 h-4 w-4" />
-                    启动
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444]/10"
-                  >
-                    <Power className="mr-2 h-4 w-4" />
-                    停止
-                  </Button>
-                </div>
+                <CardTitle>{deviceData.device?.name}</CardTitle>
+                <Badge variant={deviceData.device?.status === 'online' ? 'default' : 'secondary'}>
+                  {deviceData.device?.status === 'online' ? '在线' : '离线'}
+                </Badge>
               </div>
             </CardHeader>
             <CardContent>
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-                <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-4">
-                  <div className="flex items-center gap-2">
-                    <Thermometer className="h-4 w-4 text-[#EF4444]" />
-                    <div className="text-sm text-[#64748B]">温度</div>
-                  </div>
-                  <div className="mt-2 text-2xl font-bold text-[#1E293B]">
-                    {realtimeData.temperature.toFixed(1)}°C
-                  </div>
-                  <div className="mt-1 text-xs text-[#22C55E]">正常范围</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="text-slate-500">设备编号：</span>
+                  <span className="font-medium">{deviceData.device?.device_code || '-'}</span>
                 </div>
-
-                <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-4">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-[#3B82F6]" />
-                    <div className="text-sm text-[#64748B]">湿度</div>
-                  </div>
-                  <div className="mt-2 text-2xl font-bold text-[#1E293B]">
-                    {realtimeData.humidity.toFixed(1)}%
-                  </div>
-                  <div className="mt-1 text-xs text-[#22C55E]">正常范围</div>
+                <div>
+                  <span className="text-slate-500">位置：</span>
+                  <span className="font-medium">{deviceData.device?.location || '-'}</span>
                 </div>
-
-                <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-4">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-[#F59E0B]" />
-                    <div className="text-sm text-[#64748B]">功率</div>
-                  </div>
-                  <div className="mt-2 text-2xl font-bold text-[#1E293B]">
-                    {realtimeData.power.toFixed(0)}W
-                  </div>
-                  <div className="mt-1 text-xs text-[#64748B]">额定 500W</div>
+                <div>
+                  <span className="text-slate-500">模板：</span>
+                  <span className="font-medium">{deviceData.device?.template?.name || '-'}</span>
                 </div>
-
-                <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-4">
-                  <div className="flex items-center gap-2">
-                    <Gauge className="h-4 w-4 text-[#2563EB]" />
-                    <div className="text-sm text-[#64748B]">转速</div>
-                  </div>
-                  <div className="mt-2 text-2xl font-bold text-[#1E293B]">
-                    {realtimeData.speed.toFixed(0)}
-                  </div>
-                  <div className="mt-1 text-xs text-[#64748B]">RPM</div>
-                </div>
-
-                <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-4">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-[#22C55E]" />
-                    <div className="text-sm text-[#64748B]">效率</div>
-                  </div>
-                  <div className="mt-2 text-2xl font-bold text-[#22C55E]">
-                    {realtimeData.efficiency.toFixed(1)}%
-                  </div>
-                  <Progress
-                    value={realtimeData.efficiency}
-                    className="mt-2 h-2"
-                  />
-                </div>
-
-                <div className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-4">
-                  <div className="flex items-center gap-2">
-                    <Gauge className="h-4 w-4 text-[#8B5CF6]" />
-                    <div className="text-sm text-[#64748B]">压力</div>
-                  </div>
-                  <div className="mt-2 text-2xl font-bold text-[#1E293B]">
-                    {realtimeData.pressure.toFixed(1)} MPa
-                  </div>
-                  <div className="mt-1 text-xs text-[#22C55E]">正常</div>
+                <div>
+                  <span className="text-slate-500">更新时间：</span>
+                  <span className="font-medium">
+                    {deviceData.recordedAt 
+                      ? new Date(deviceData.recordedAt).toLocaleString()
+                      : '-'}
+                  </span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Tabs */}
-          <Tabs defaultValue="trend" className="w-full">
-            <TabsList className="bg-[#F8FAFC]">
-              <TabsTrigger value="trend">数据趋势</TabsTrigger>
-              <TabsTrigger value="control">远程控制</TabsTrigger>
-              <TabsTrigger value="log">运行日志</TabsTrigger>
-            </TabsList>
-            <TabsContent value="trend" className="mt-4">
-              <Card className="border-[#E2E8F0] bg-white shadow-sm">
-                <CardContent className="pt-6">
-                  <AreaChartComponent
-                    data={trendData}
-                    dataKey="online"
-                    xAxisKey="date"
-                    color="#2563EB"
-                    height={250}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="control" className="mt-4">
-              <Card className="border-[#E2E8F0] bg-white shadow-sm">
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <Button className="h-20 bg-[#22C55E] hover:bg-[#22C55E]/90">
-                      <div className="flex flex-col items-center gap-2">
-                        <Power className="h-6 w-6" />
-                        <span>启动设备</span>
+          {/* Realtime Data Grid */}
+          {templateFields.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {templateFields.map((field) => {
+                const value = getFieldValue(field.field_key);
+                const isAlert = isFieldAlert(field);
+                
+                return (
+                  <Card key={field.id} className={isAlert ? 'border-red-500' : ''}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-slate-500">{field.field_name}</span>
+                        {isAlert && (
+                          <AlertTriangle className="h-4 w-4 text-red-500" />
+                        )}
                       </div>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-20 border-[#EF4444] text-[#EF4444] hover:bg-[#EF4444]/10"
-                    >
-                      <div className="flex flex-col items-center gap-2">
-                        <Power className="h-6 w-6" />
-                        <span>停止设备</span>
+                      <div className="text-2xl font-bold" style={{ color: field.color || '#2563EB' }}>
+                        {value}
+                        {field.unit && <span className="text-sm ml-1">{field.unit}</span>}
                       </div>
-                    </Button>
-                    <Button variant="outline" className="h-20">
-                      <div className="flex flex-col items-center gap-2">
-                        <RefreshCw className="h-6 w-6" />
-                        <span>重启设备</span>
-                      </div>
-                    </Button>
-                    <Button variant="outline" className="h-20">
-                      <div className="flex flex-col items-center gap-2">
-                        <Settings className="h-6 w-6" />
-                        <span>设备设置</span>
-                      </div>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="log" className="mt-4">
-              <Card className="border-[#E2E8F0] bg-white shadow-sm">
-                <CardContent className="pt-6">
-                  <div className="space-y-3">
-                    {[
-                      { time: '10:32:15', type: 'info', msg: '设备启动成功' },
-                      { time: '10:30:00', type: 'warn', msg: '温度过高预警' },
-                      { time: '10:15:30', type: 'info', msg: '参数调整完成' },
-                      { time: '09:45:20', type: 'error', msg: '通信中断' },
-                      { time: '09:30:00', type: 'info', msg: '设备上线' },
-                    ].map((log, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3"
-                      >
-                        <div
-                          className={`h-2 w-2 rounded-full ${
-                            log.type === 'error'
-                              ? 'bg-[#EF4444]'
-                              : log.type === 'warn'
-                                ? 'bg-[#F59E0B]'
-                                : 'bg-[#22C55E]'
-                          }`}
-                        />
-                        <div className="text-sm text-[#64748B]">{log.time}</div>
-                        <div className="text-sm text-[#1E293B]">{log.msg}</div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
+                      {field.min_value !== null && field.max_value !== null && (
+                        <div className="text-xs text-slate-400 mt-2">
+                          正常范围: {field.min_value} ~ {field.max_value} {field.unit}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="py-10 text-center text-slate-500">
+                <p>该设备未配置监控参数模板</p>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   );
 }
