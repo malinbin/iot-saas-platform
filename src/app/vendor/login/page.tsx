@@ -35,8 +35,8 @@ export default function VendorLoginPage() {
         localStorage.setItem('vendorInfo', JSON.stringify(data.vendor));
         localStorage.setItem('vendorLoggedIn', 'true');
         
-        // 跳转到厂家首页
-        router.push('/vendor');
+        // 强制刷新页面，确保认证状态生效
+        window.location.href = '/vendor';
       } else {
         setError(data.error || '登录失败');
       }
