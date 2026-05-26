@@ -1,256 +1,259 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  Activity,
+import { MobileHeader } from '@/components/user/mobile-header';
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Activity, 
+  Box, 
   AlertTriangle,
-  Box,
-  TrendingUp,
-  Clock,
+  ChevronRight,
   Zap,
   Thermometer,
-  Gauge,
+  Gauge
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { AreaChartComponent, BarChartComponent } from '@/components/charts';
-import {
-  generateVendors,
-  generateDevices,
-  generateTrendData,
-  generateRevenueTrend,
-} from '@/lib/mock-data';
+import Link from 'next/link';
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer } from 'recharts';
+
+interface DeviceStats {
+  total: number;
+  online: number;
+  fault: number;
+  offline: number;
+}
+
+interface ProductionData {
+  date: string;
+  output: number;
+  efficiency: number;
+}
 
 export default function UserDashboard() {
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [stats, setStats] = useState<DeviceStats>({ total: 0, online: 0, fault: 0, offline: 0 });
+  const [productionData, setProductionData] = useState<ProductionData[]>([]);
+  const [realtimeData, setRealtimeData] = useState({
+    output: 0,
+    efficiency: 0,
+    runtime: 0,
+    temperature: 0,
+    power: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
-  // 模拟用户购买的设备
-  const vendors = generateVendors();
-  const devices = generateDevices(12, [vendors[0]]);
-  const trendData = generateTrendData();
-  const productionData = generateRevenueTrend();
-
-  // 统计
-  const totalDevices = devices.length;
-  const onlineDevices = devices.filter((d) => d.status === 'online').length;
-  const faultDevices = devices.filter((d) => d.status === 'fault').length;
-
-  // 模拟生产数据
-  const productionMetrics = {
-    output: 12580,
-    efficiency: 94.5,
-    runtime: 156.2,
-    downtime: 3.8,
-  };
-
-  // 自动刷新
   useEffect(() => {
-    const interval = setInterval(() => {
-      setRefreshKey((k) => k + 1);
-    }, 30000);
+    fetchDashboardData();
+    const interval = setInterval(fetchRealtimeData, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  // 生产数据柱状图
-  const productionBarData = productionData.slice(-6).map((item) => ({
-    month: item.month.split('-')[1] + '月',
-    output: item.devices * 100,
-  }));
+  const fetchDashboardData = async () => {
+    try {
+      // 获取设备统计
+      const statsRes = await fetch('/api/user/devices/stats');
+      if (statsRes.ok) {
+        const data = await statsRes.json();
+        setStats(data);
+      }
+
+      // 获取生产数据
+      const productionRes = await fetch('/api/user/production/trend');
+      if (productionRes.ok) {
+        const data = await productionRes.json();
+        setProductionData(data);
+      }
+
+      setLoading(false);
+    } catch (error) {
+      console.error('获取数据失败:', error);
+      setLoading(false);
+    }
+  };
+
+  const fetchRealtimeData = async () => {
+    try {
+      const res = await fetch('/api/user/production/realtime');
+      if (res.ok) {
+        const data = await res.json();
+        setRealtimeData(data);
+      }
+    } catch (error) {
+      console.error('获取实时数据失败:', error);
+    }
+  };
+
+  const formatRuntime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+  };
 
   return (
-    <div key={refreshKey} className="space-y-6">
-      {/* Welcome */}
-      <div className="rounded-2xl bg-gradient-to-r from-[#0EA5E9] to-[#38BDF8] p-6 text-white">
-        <h1 className="text-2xl font-bold">生产概览</h1>
-        <p className="mt-1 text-white/80">
-          实时监控生产设备运行状态，掌握生产数据
-        </p>
-      </div>
-
-      {/* Core Metrics - Large Cards */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-        {/* Output */}
-        <Card className="border-[#E0F2FE] bg-white shadow-sm">
-          <CardContent className="pt-8 pb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-medium text-[#64748B]">
-                  今日产量
-                </div>
-                <div className="mt-2 text-5xl font-bold text-[#0F172A]">
-                  {productionMetrics.output.toLocaleString()}
-                </div>
-                <div className="mt-2 flex items-center text-sm text-[#22C55E]">
-                  <TrendingUp className="mr-1 h-4 w-4" />
-                  较昨日 +12.5%
-                </div>
-              </div>
-              <div className="rounded-2xl bg-[#F0F9FF] p-6">
-                <Zap className="h-12 w-12 text-[#0EA5E9]" />
-              </div>
+    <div className="min-h-screen bg-[#F8FAFC]">
+      <MobileHeader title="生产概览" />
+      
+      <div className="px-4 py-4 space-y-4">
+        {/* 实时数据卡片 */}
+        <div className="bg-gradient-to-br from-[#0EA5E9] to-[#38BDF8] rounded-2xl p-5 text-white">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              <span className="font-medium">实时生产数据</span>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Efficiency */}
-        <Card className="border-[#E0F2FE] bg-white shadow-sm">
-          <CardContent className="pt-8 pb-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-medium text-[#64748B]">
-                  生产效率
-                </div>
-                <div className="mt-2 text-5xl font-bold text-[#22C55E]">
-                  {productionMetrics.efficiency}%
-                </div>
-                <div className="mt-2">
-                  <Progress
-                    value={productionMetrics.efficiency}
-                    className="h-3 bg-[#E0F2FE]"
-                  />
-                </div>
-              </div>
-              <div className="rounded-2xl bg-[#F0FDF4] p-6">
-                <Activity className="h-12 w-12 text-[#22C55E]" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Device Status */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card className="border-[#E0F2FE] bg-white shadow-sm">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-[#64748B]">设备总数</div>
-                <div className="mt-1 text-3xl font-bold text-[#0F172A]">
-                  {totalDevices}
-                </div>
-              </div>
-              <Box className="h-8 w-8 text-[#0EA5E9]" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-[#E0F2FE] bg-white shadow-sm">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-[#64748B]">在线设备</div>
-                <div className="mt-1 text-3xl font-bold text-[#22C55E]">
-                  {onlineDevices}
-                </div>
-              </div>
-              <Activity className="h-8 w-8 text-[#22C55E]" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-[#E0F2FE] bg-white shadow-sm">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm text-[#64748B]">故障设备</div>
-                <div className="mt-1 text-3xl font-bold text-[#EF4444]">
-                  {faultDevices}
-                </div>
-              </div>
-              <AlertTriangle className="h-8 w-8 text-[#EF4444]" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="border-[#E0F2FE] bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg text-[#0F172A]">
-              产量趋势
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AreaChartComponent
-              data={trendData}
-              dataKey="online"
-              xAxisKey="date"
-              color="#0EA5E9"
-              height={250}
-            />
-          </CardContent>
-        </Card>
-
-        <Card className="border-[#E0F2FE] bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg text-[#0F172A]">
-              月度产量
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BarChartComponent
-              data={productionBarData}
-              xAxisKey="month"
-              bars={[{ dataKey: 'output', name: '产量', color: '#0EA5E9' }]}
-              height={250}
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Device List */}
-      <Card className="border-[#E0F2FE] bg-white shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg text-[#0F172A]">我的设备</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {devices.slice(0, 6).map((device) => (
-              <div
-                key={device.id}
-                className="rounded-xl border border-[#E0F2FE] bg-[#F8FAFC] p-5"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="text-lg font-semibold text-[#0F172A]">
-                    {device.name}
-                  </div>
-                  <Badge
-                    className={`text-xs ${
-                      device.status === 'online'
-                        ? 'bg-[#22C55E]/10 text-[#22C55E]'
-                        : device.status === 'fault'
-                          ? 'bg-[#EF4444]/10 text-[#EF4444]'
-                          : 'bg-[#94A3B8]/10 text-[#94A3B8]'
-                    }`}
-                  >
-                    {device.status === 'online'
-                      ? '在线'
-                      : device.status === 'fault'
-                        ? '故障'
-                        : '离线'}
-                  </Badge>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2">
-                    <Thermometer className="h-4 w-4 text-[#64748B]" />
-                    <span className="text-sm text-[#64748B]">
-                      {device.metrics.temperature}°C
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Gauge className="h-4 w-4 text-[#64748B]" />
-                    <span className="text-sm text-[#64748B]">
-                      {device.metrics.efficiency}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+            <span className="text-xs opacity-80">5秒前更新</span>
           </div>
-        </CardContent>
-      </Card>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm opacity-80">当前产量</p>
+              <p className="text-2xl font-bold mt-1">{realtimeData.output.toFixed(1)}</p>
+              <p className="text-xs opacity-60 mt-0.5">件/小时</p>
+            </div>
+            <div>
+              <p className="text-sm opacity-80">运行效率</p>
+              <p className="text-2xl font-bold mt-1">{realtimeData.efficiency.toFixed(1)}%</p>
+              <div className="w-full bg-white/20 rounded-full h-1.5 mt-2">
+                <div 
+                  className="bg-white rounded-full h-1.5" 
+                  style={{ width: `${realtimeData.efficiency}%` }}
+                />
+              </div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/20">
+            <div className="text-center">
+              <Thermometer className="h-4 w-4 mx-auto mb-1 opacity-80" />
+              <p className="text-lg font-semibold">{realtimeData.temperature.toFixed(1)}°</p>
+              <p className="text-xs opacity-60">温度</p>
+            </div>
+            <div className="text-center">
+              <Zap className="h-4 w-4 mx-auto mb-1 opacity-80" />
+              <p className="text-lg font-semibold">{realtimeData.power.toFixed(0)}W</p>
+              <p className="text-xs opacity-60">功率</p>
+            </div>
+            <div className="text-center">
+              <Gauge className="h-4 w-4 mx-auto mb-1 opacity-80" />
+              <p className="text-lg font-semibold">{formatRuntime(realtimeData.runtime)}</p>
+              <p className="text-xs opacity-60">运行时长</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 设备状态 */}
+        <div className="bg-white rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-gray-900">设备状态</h2>
+            <Link 
+              href="/user/devices" 
+              className="text-sm text-[#0EA5E9] flex items-center gap-1"
+            >
+              查看全部 <ChevronRight className="h-4 w-4" />
+            </Link>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-2">
+            <div className="text-center p-3 bg-blue-50 rounded-xl">
+              <p className="text-2xl font-bold text-[#0EA5E9]">{stats.total}</p>
+              <p className="text-xs text-gray-500 mt-1">总设备</p>
+            </div>
+            <div className="text-center p-3 bg-green-50 rounded-xl">
+              <p className="text-2xl font-bold text-green-600">{stats.online}</p>
+              <p className="text-xs text-gray-500 mt-1">在线</p>
+            </div>
+            <div className="text-center p-3 bg-orange-50 rounded-xl">
+              <p className="text-2xl font-bold text-orange-500">{stats.fault}</p>
+              <p className="text-xs text-gray-500 mt-1">故障</p>
+            </div>
+            <div className="text-center p-3 bg-gray-50 rounded-xl">
+              <p className="text-2xl font-bold text-gray-400">{stats.offline}</p>
+              <p className="text-xs text-gray-500 mt-1">离线</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 产量趋势 */}
+        <div className="bg-white rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-gray-900">产量趋势</h2>
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-[#0EA5E9]" />
+                <span className="text-gray-500">产量</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+                <span className="text-gray-500">效率</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="h-40">
+            {productionData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={productionData}>
+                  <XAxis 
+                    dataKey="date" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 10, fill: '#9CA3AF' }}
+                  />
+                  <YAxis hide />
+                  <Area 
+                    type="monotone" 
+                    dataKey="output" 
+                    stroke="#0EA5E9" 
+                    fill="#0EA5E9" 
+                    fillOpacity={0.1}
+                    strokeWidth={2}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="efficiency" 
+                    stroke="#22C55E" 
+                    fill="#22C55E" 
+                    fillOpacity={0.1}
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400 text-sm">
+                暂无数据
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 快捷入口 */}
+        <div className="grid grid-cols-2 gap-3">
+          <Link 
+            href="/user/devices"
+            className="bg-white rounded-2xl p-4 flex items-center gap-3"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+              <Box className="h-5 w-5 text-[#0EA5E9]" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">设备监控</p>
+              <p className="text-xs text-gray-500">查看设备详情</p>
+            </div>
+          </Link>
+          
+          <Link 
+            href="/user/alerts"
+            className="bg-white rounded-2xl p-4 flex items-center gap-3"
+          >
+            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">故障报警</p>
+              <p className="text-xs text-gray-500">{stats.fault} 条待处理</p>
+            </div>
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }

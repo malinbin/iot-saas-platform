@@ -1,243 +1,164 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import {
-  Activity,
+import { useEffect, useState } from 'react';
+import { MobileHeader } from '@/components/user/mobile-header';
+import { 
+  Box, 
+  Wifi, 
+  WifiOff, 
   AlertTriangle,
-  Box,
+  ChevronRight,
   Thermometer,
   Gauge,
   Zap,
-  Power,
+  Clock
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
-import { AreaChartComponent } from '@/components/charts';
-import { generateVendors, generateDevices, generateTrendData } from '@/lib/mock-data';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
+
+interface Device {
+  id: string;
+  name: string;
+  serial_number: string;
+  status: string;
+  device_type: string;
+  location: string;
+  last_heartbeat_at: string;
+}
 
 export default function UserDevicesPage() {
-  const vendors = generateVendors();
-  const devices = generateDevices(12, [vendors[0]]);
-  const [selectedDevice, setSelectedDevice] = useState(devices[0]);
-  const trendData = generateTrendData();
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'online' | 'fault'>('all');
 
-  // 模拟实时数据 - 使用 useState 避免渲染期间的 Math.random
-  const [realtimeData, setRealtimeData] = useState({
-    temperature: 47.5,
-    humidity: 65.0,
-    power: 480,
-    efficiency: 94.0,
-  });
-
-  // 模拟数据更新
   useEffect(() => {
-    const interval = setInterval(() => {
-      setRealtimeData({
-        temperature: 45.2 + Math.random() * 5,
-        humidity: 62.5 + Math.random() * 10,
-        power: 456 + Math.random() * 50,
-        efficiency: 92.3 + Math.random() * 5,
-      });
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    fetchDevices();
+  }, [filter]);
+
+  const fetchDevices = async () => {
+    try {
+      const res = await fetch(`/api/user/devices?status=${filter}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDevices(data);
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error('获取设备列表失败:', error);
+      setLoading(false);
+    }
+  };
+
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'online':
+        return { icon: Wifi, color: 'text-green-500', bg: 'bg-green-50', label: '在线' };
+      case 'offline':
+        return { icon: WifiOff, color: 'text-gray-400', bg: 'bg-gray-50', label: '离线' };
+      case 'fault':
+        return { icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-50', label: '故障' };
+      default:
+        return { icon: Box, color: 'text-gray-400', bg: 'bg-gray-50', label: '未知' };
+    }
+  };
+
+  const formatLastSeen = (dateStr: string) => {
+    if (!dateStr) return '未知';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diff < 60) return '刚刚';
+    if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+    return `${Math.floor(diff / 86400)} 天前`;
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-[#0F172A]">设备监控</h1>
-        <p className="text-sm text-[#64748B]">查看购买设备的实时运行状态</p>
-      </div>
-
-      {/* Device Selection */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Device List */}
-        <Card className="border-[#E0F2FE] bg-white shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-lg text-[#0F172A]">我的设备</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {devices.map((device) => (
-                <div
-                  key={device.id}
-                  onClick={() => setSelectedDevice(device)}
-                  className={`cursor-pointer rounded-xl border p-4 transition-colors ${
-                    selectedDevice.id === device.id
-                      ? 'border-[#0EA5E9] bg-[#F0F9FF]'
-                      : 'border-[#E0F2FE] hover:bg-[#F8FAFC]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-semibold text-[#0F172A]">
-                      {device.name}
-                    </div>
-                    <Badge
-                      className={`text-xs ${
-                        device.status === 'online'
-                          ? 'bg-[#22C55E]/10 text-[#22C55E]'
-                          : device.status === 'fault'
-                            ? 'bg-[#EF4444]/10 text-[#EF4444]'
-                            : 'bg-[#94A3B8]/10 text-[#94A3B8]'
-                      }`}
-                    >
-                      {device.status === 'online'
-                        ? '在线'
-                        : device.status === 'fault'
-                          ? '故障'
-                          : '离线'}
-                    </Badge>
-                  </div>
-                  <div className="mt-2 text-xs text-[#64748B]">
-                    {device.model}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Device Detail */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="border-[#E0F2FE] bg-white shadow-sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-xl text-[#0F172A]">
-                    {selectedDevice.name}
-                  </CardTitle>
-                  <div className="mt-1 text-sm text-[#64748B]">
-                    {selectedDevice.model} · {selectedDevice.location}
-                  </div>
-                </div>
-                <Badge
-                  className={`text-sm ${
-                    selectedDevice.status === 'online'
-                      ? 'bg-[#22C55E]/10 text-[#22C55E]'
-                      : 'bg-[#EF4444]/10 text-[#EF4444]'
-                  }`}
-                >
-                  {selectedDevice.status === 'online' ? '运行中' : '故障'}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Large Metrics */}
-              <div className="grid grid-cols-2 gap-6">
-                <div className="rounded-xl bg-gradient-to-br from-[#F0F9FF] to-[#E0F2FE] p-6">
-                  <div className="flex items-center gap-2">
-                    <Thermometer className="h-5 w-5 text-[#0EA5E9]" />
-                    <div className="text-sm font-medium text-[#64748B]">
-                      温度
-                    </div>
-                  </div>
-                  <div className="mt-3 text-4xl font-bold text-[#0F172A]">
-                    {realtimeData.temperature.toFixed(1)}°C
-                  </div>
-                  <div className="mt-2 text-sm text-[#22C55E]">正常范围</div>
-                </div>
-
-                <div className="rounded-xl bg-gradient-to-br from-[#F0FDF4] to-[#DCFCE7] p-6">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-[#22C55E]" />
-                    <div className="text-sm font-medium text-[#64748B]">
-                      效率
-                    </div>
-                  </div>
-                  <div className="mt-3 text-4xl font-bold text-[#22C55E]">
-                    {realtimeData.efficiency.toFixed(1)}%
-                  </div>
-                  <Progress
-                    value={realtimeData.efficiency}
-                    className="mt-3 h-2"
-                  />
-                </div>
-
-                <div className="rounded-xl bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A] p-6">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-5 w-5 text-[#F59E0B]" />
-                    <div className="text-sm font-medium text-[#64748B]">
-                      功率
-                    </div>
-                  </div>
-                  <div className="mt-3 text-4xl font-bold text-[#0F172A]">
-                    {realtimeData.power.toFixed(0)}W
-                  </div>
-                  <div className="mt-2 text-sm text-[#64748B]">额定 500W</div>
-                </div>
-
-                <div className="rounded-xl bg-gradient-to-br from-[#F0F9FF] to-[#E0F2FE] p-6">
-                  <div className="flex items-center gap-2">
-                    <Gauge className="h-5 w-5 text-[#0EA5E9]" />
-                    <div className="text-sm font-medium text-[#64748B]">
-                      湿度
-                    </div>
-                  </div>
-                  <div className="mt-3 text-4xl font-bold text-[#0F172A]">
-                    {realtimeData.humidity.toFixed(1)}%
-                  </div>
-                  <div className="mt-2 text-sm text-[#22C55E]">正常范围</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Tabs */}
-          <Tabs defaultValue="trend" className="w-full">
-            <TabsList className="bg-[#F0F9FF]">
-              <TabsTrigger value="trend">数据趋势</TabsTrigger>
-              <TabsTrigger value="info">设备信息</TabsTrigger>
-            </TabsList>
-            <TabsContent value="trend" className="mt-4">
-              <Card className="border-[#E0F2FE] bg-white shadow-sm">
-                <CardContent className="pt-6">
-                  <AreaChartComponent
-                    data={trendData}
-                    dataKey="online"
-                    xAxisKey="date"
-                    color="#0EA5E9"
-                    height={250}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="info" className="mt-4">
-              <Card className="border-[#E0F2FE] bg-white shadow-sm">
-                <CardContent className="pt-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="rounded-lg bg-[#F8FAFC] p-4">
-                      <div className="text-sm text-[#64748B]">设备编号</div>
-                      <div className="mt-1 text-lg font-semibold text-[#0F172A]">
-                        {selectedDevice.id}
-                      </div>
-                    </div>
-                    <div className="rounded-lg bg-[#F8FAFC] p-4">
-                      <div className="text-sm text-[#64748B]">设备型号</div>
-                      <div className="mt-1 text-lg font-semibold text-[#0F172A]">
-                        {selectedDevice.model}
-                      </div>
-                    </div>
-                    <div className="rounded-lg bg-[#F8FAFC] p-4">
-                      <div className="text-sm text-[#64748B]">安装位置</div>
-                      <div className="mt-1 text-lg font-semibold text-[#0F172A]">
-                        {selectedDevice.location}
-                      </div>
-                    </div>
-                    <div className="rounded-lg bg-[#F8FAFC] p-4">
-                      <div className="text-sm text-[#64748B]">厂家</div>
-                      <div className="mt-1 text-lg font-semibold text-[#0F172A]">
-                        {selectedDevice.vendorName}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+    <div className="min-h-screen bg-[#F8FAFC]">
+      <MobileHeader title="设备监控" />
+      
+      <div className="px-4 py-4 space-y-4">
+        {/* 筛选标签 */}
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {(['all', 'online', 'fault'] as const).map((status) => (
+            <button
+              key={status}
+              onClick={() => setFilter(status)}
+              className={cn(
+                'px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
+                filter === status
+                  ? 'bg-[#0EA5E9] text-white'
+                  : 'bg-white text-gray-600 border border-gray-200'
+              )}
+            >
+              {status === 'all' ? '全部' : status === 'online' ? '在线' : '故障'}
+            </button>
+          ))}
         </div>
+
+        {/* 设备列表 */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0EA5E9]" />
+          </div>
+        ) : devices.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 text-center">
+            <Box className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+            <p className="text-gray-500">暂无设备数据</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {devices.map((device) => {
+              const statusConfig = getStatusConfig(device.status);
+              const StatusIcon = statusConfig.icon;
+              
+              return (
+                <Link
+                  key={device.id}
+                  href={`/user/devices/${device.id}`}
+                  className="block bg-white rounded-2xl p-4"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-gray-900">{device.name}</h3>
+                        <span className={cn(
+                          'px-2 py-0.5 rounded-full text-xs',
+                          statusConfig.bg,
+                          statusConfig.color
+                        )}>
+                          {statusConfig.label}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-1 mt-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <StatusIcon className="h-4 w-4" />
+                          <span>SN: {device.serial_number}</span>
+                        </div>
+                        
+                        {device.location && (
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <Box className="h-4 w-4" />
+                            <span>{device.location}</span>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Clock className="h-4 w-4" />
+                          <span>最后在线: {formatLastSeen(device.last_heartbeat_at)}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <ChevronRight className="h-5 w-5 text-gray-300" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
