@@ -12,6 +12,7 @@ import {
   BarChart3,
   Cog,
   ChevronRight,
+  LayoutTemplate,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +20,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: '数据大盘', href: '/admin' },
   { icon: Building2, label: '厂家管理', href: '/admin/vendors' },
   { icon: Users, label: '用户管理', href: '/admin/users' },
+  { icon: LayoutTemplate, label: '设备模板', href: '/admin/templates' },
   { icon: Cog, label: '设备管理', href: '/admin/devices' },
   { icon: AlertTriangle, label: '告警中心', href: '/admin/alerts' },
   { icon: BarChart3, label: '数据分析', href: '/admin/analytics' },
