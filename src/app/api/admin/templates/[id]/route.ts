@@ -31,7 +31,7 @@ export async function GET(
   }
 }
 
-// PUT /api/admin/templates/[id] - 更新模板
+// PUT /api/admin/templates/[id] - 更新模板（含字段）
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -40,9 +40,10 @@ export async function PUT(
     const { id } = await params;
     const supabaseClient = getSupabaseClient();
     const body = await request.json();
-    const { name, code, category, description, icon, dashboard_config, detail_config, is_active } = body;
+    const { name, code, category, description, icon, dashboard_config, detail_config, is_active, fields } = body;
 
-    const { data, error } = await supabaseClient
+    // 更新模板基本信息
+    const { data: template, error: templateError } = await supabaseClient
       .from('device_templates')
       .update({
         name,
@@ -59,12 +60,68 @@ export async function PUT(
       .select()
       .single();
 
-    if (error) {
-      console.error('更新模板失败:', error);
-      return NextResponse.json({ error: '更新模板失败' }, { status: 500 });
+    if (templateError) {
+      console.error('更新模板失败:', templateError);
+      return NextResponse.json({ error: '更新模板失败: ' + templateError.message }, { status: 500 });
     }
 
-    return NextResponse.json({ template: data });
+    // 如果有字段数据，更新字段
+    if (fields && Array.isArray(fields)) {
+      // 先删除现有字段
+      const { error: deleteError } = await supabaseClient
+        .from('template_fields')
+        .delete()
+        .eq('template_id', id);
+
+      if (deleteError) {
+        console.error('删除旧字段失败:', deleteError);
+      }
+
+      // 插入新字段
+      const fieldsToInsert = fields.map((field: Record<string, unknown>, index: number) => ({
+        template_id: id,
+        field_key: field.field_key || `field_${index}`,
+        field_name: field.field_name || field.name,
+        field_type: field.field_type || 'number',
+        unit: field.unit || '',
+        icon: field.icon || '',
+        color: field.color || '#3B82F6',
+        chart_type: field.chart_type || 'line',
+        show_in_dashboard: field.show_in_dashboard !== false,
+        alert_min: field.alert_min || null,
+        alert_max: field.alert_max || null,
+        sort_order: index,
+        card_width: field.card_width || 'half',
+        created_at: new Date().toISOString(),
+      }));
+
+      if (fieldsToInsert.length > 0) {
+        const { error: fieldsError } = await supabaseClient
+          .from('template_fields')
+          .insert(fieldsToInsert);
+
+        if (fieldsError) {
+          console.error('更新字段失败:', fieldsError);
+          return NextResponse.json({ error: '更新字段失败: ' + fieldsError.message }, { status: 500 });
+        }
+      }
+    }
+
+    // 重新获取更新后的模板（含字段）
+    const { data: updatedTemplate, error: fetchError } = await supabaseClient
+      .from('device_templates')
+      .select(`
+        *,
+        fields:template_fields(*)
+      `)
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      return NextResponse.json({ template }); // 返回基本信息
+    }
+
+    return NextResponse.json({ template: updatedTemplate });
   } catch (error) {
     console.error('更新模板失败:', error);
     return NextResponse.json({ error: '服务器错误' }, { status: 500 });
@@ -79,20 +136,14 @@ export async function DELETE(
   try {
     const { id } = await params;
     const supabaseClient = getSupabaseClient();
-    
+
     // 先删除关联的字段
     await supabaseClient
       .from('template_fields')
       .delete()
       .eq('template_id', id);
 
-    // 再删除关联的权限
-    await supabaseClient
-      .from('template_permissions')
-      .delete()
-      .eq('template_id', id);
-
-    // 最后删除模板
+    // 再删除模板
     const { error } = await supabaseClient
       .from('device_templates')
       .delete()

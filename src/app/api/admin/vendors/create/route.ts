@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     if (vendorError) {
       console.error('Create vendor error:', vendorError);
-      return NextResponse.json({ error: '创建厂家失败' }, { status: 500 });
+      return NextResponse.json({ error: '创建厂家失败', details: vendorError.message }, { status: 500 });
     }
 
     // 创建关联的用户账号（厂家管理员）
@@ -87,6 +87,7 @@ export async function POST(request: NextRequest) {
 
     if (userError) {
       console.error('Create user profile error:', userError);
+      // 不影响厂家创建，只记录错误
     }
 
     return NextResponse.json({

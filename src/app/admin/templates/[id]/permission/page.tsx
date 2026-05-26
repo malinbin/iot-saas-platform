@@ -220,8 +220,8 @@ export default function TemplatePermissionPage() {
   };
 
   const filteredPermissions = permissions.filter(p => 
-    p.vendor_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.vendor_code.toLowerCase().includes(searchTerm.toLowerCase())
+    (p.vendor_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+    (p.vendor_code?.toLowerCase() || '').includes(searchTerm.toLowerCase())
   );
 
   const availableVendors = vendors.filter(v => 
