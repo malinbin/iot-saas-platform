@@ -151,7 +151,8 @@ export default function VendorDevicesPage() {
   const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [devices, setDevices] = useState<Device[]>(mockDevices);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [loading, setLoading] = useState(true);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
@@ -171,7 +172,23 @@ export default function VendorDevicesPage() {
   // 加载可用模板
   useEffect(() => {
     loadTemplates();
+    loadDevices();
   }, []);
+
+  const loadDevices = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/vendor/devices');
+      if (res.ok) {
+        const data = await res.json();
+        setDevices(data.data || []);
+      }
+    } catch (error) {
+      console.error('加载设备失败:', error);
+      toast({ title: '加载失败', description: '无法加载设备列表', variant: 'error' });
+    }
+    setLoading(false);
+  };
 
   const loadTemplates = async () => {
     setLoadingTemplates(true);
@@ -266,64 +283,34 @@ export default function VendorDevicesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...newDevice,
+          type: selectedTemplate.name,
           template_id: selectedTemplate.id,
-          device_type: selectedTemplate.name,
-          field_values: fieldValues,
         }),
       });
 
-      if (res.ok) {
+      const data = await res.json();
+
+      if (res.ok && data.success) {
         toast({
           title: '设备添加成功',
           description: `设备 ${newDevice.name} 已添加到系统`,
         });
         setAddDialogOpen(false);
         resetForm();
-        // 刷新设备列表
+        loadDevices(); // 刷新设备列表
       } else {
-        // 本地模拟添加
-        const device: Device = {
-          id: String(devices.length + 1),
-          name: newDevice.name,
-          sn: newDevice.sn,
-          type: selectedTemplate.name,
-          template_id: selectedTemplate.id,
-          template_name: selectedTemplate.name,
-          status: 'offline',
-          location: newDevice.location || '未设置',
-          customer: newDevice.customer || '未分配',
-          lastUpdate: new Date().toLocaleString(),
-          alerts: 0,
-        };
-        setDevices([...devices, device]);
-        setAddDialogOpen(false);
-        resetForm();
         toast({
-          title: '设备添加成功',
-          description: `设备 ${device.name} 已添加到系统`,
+          title: '添加失败',
+          description: data.error || '请稍后重试',
+          variant: 'error',
         });
       }
     } catch (error) {
-      // 本地模拟添加
-      const device: Device = {
-        id: String(devices.length + 1),
-        name: newDevice.name,
-        sn: newDevice.sn,
-        type: selectedTemplate?.name || '未知',
-        template_id: selectedTemplate?.id,
-        template_name: selectedTemplate?.name,
-        status: 'offline',
-        location: newDevice.location || '未设置',
-        customer: newDevice.customer || '未分配',
-        lastUpdate: new Date().toLocaleString(),
-        alerts: 0,
-      };
-      setDevices([...devices, device]);
-      setAddDialogOpen(false);
-      resetForm();
+      console.error('添加设备失败:', error);
       toast({
-        title: '设备添加成功',
-        description: `设备 ${device.name} 已添加到系统`,
+        title: '添加失败',
+        description: '网络错误，请稍后重试',
+        variant: 'error',
       });
     }
   };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Search,
   Filter,
@@ -9,6 +9,7 @@ import {
   XCircle,
   Clock,
   Building2,
+  Plus,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,14 +44,83 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { generateVendors } from '@/lib/mock-data';
+import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
+
+interface Vendor {
+  id: string;
+  name: string;
+  code: string;
+  contact_name: string;
+  contact_phone: string;
+  contact_email: string;
+  status: string;
+  is_active: boolean;
+  expires_at: string | null;
+  device_count: number;
+  user_count: number;
+  is_expired: boolean;
+  created_at: string;
+}
 
 export default function VendorsPage() {
-  const vendors = generateVendors();
+  const { toast } = useToast();
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedVendor, setSelectedVendor] = useState<string | null>(null);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  useEffect(() => {
+    loadVendors();
+  }, []);
+
+  const loadVendors = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/vendors');
+      if (res.ok) {
+        const data = await res.json();
+        setVendors(data.data || []);
+      }
+    } catch (error) {
+      console.error('加载厂家失败:', error);
+    }
+    setLoading(false);
+  };
+
+  const handleApprove = async (vendor: Vendor) => {
+    try {
+      const res = await fetch('/api/admin/vendors', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: vendor.id, status: 'approved' }),
+      });
+      if (res.ok) {
+        toast({ title: '审核通过', description: `${vendor.name} 已通过审核` });
+        loadVendors();
+      }
+    } catch (error) {
+      toast({ title: '操作失败', variant: 'error' });
+    }
+  };
+
+  const handleReject = async (vendor: Vendor) => {
+    try {
+      const res = await fetch('/api/admin/vendors', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: vendor.id, status: 'rejected' }),
+      });
+      if (res.ok) {
+        toast({ title: '已拒绝', description: `${vendor.name} 入驻申请已拒绝` });
+        loadVendors();
+      }
+    } catch (error) {
+      toast({ title: '操作失败', variant: 'error' });
+    }
+  };
 
   // 筛选厂家
   const filteredVendors = vendors.filter((vendor) => {
@@ -77,10 +147,12 @@ export default function VendorsPage() {
             管理所有合作厂家，审核入驻申请
           </p>
         </div>
-        <Button className="bg-[#2563EB] hover:bg-[#2563EB]/90">
-          <Building2 className="mr-2 h-4 w-4" />
-          邀请厂家
-        </Button>
+        <Link href="/admin/vendors/create">
+          <Button className="bg-[#2563EB] hover:bg-[#2563EB]/90">
+            <Plus className="mr-2 h-4 w-4" />
+            创建厂家账号
+          </Button>
+        </Link>
       </div>
 
       {/* Statistics Cards */}
@@ -192,88 +264,102 @@ export default function VendorsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredVendors.map((vendor) => (
-                <TableRow
-                  key={vendor.id}
-                  className="border-[#1E3A5F] hover:bg-[#0A1628]"
-                >
-                  <TableCell className="font-medium text-white">
-                    {vendor.name}
-                  </TableCell>
-                  <TableCell className="text-[#94A3B8]">
-                    {vendor.contact}
-                  </TableCell>
-                  <TableCell className="text-[#94A3B8]">
-                    {vendor.email}
-                  </TableCell>
-                  <TableCell className="text-[#94A3B8]">
-                    {vendor.phone}
-                  </TableCell>
-                  <TableCell className="text-white">
-                    {vendor.deviceCount}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={`border-0 ${
-                        vendor.status === 'approved'
-                          ? 'bg-[#22C55E]/20 text-[#22C55E]'
-                          : vendor.status === 'pending'
-                            ? 'bg-[#F97316]/20 text-[#F97316]'
-                            : 'bg-[#EF4444]/20 text-[#EF4444]'
-                      }`}
-                    >
-                      {vendor.status === 'approved'
-                        ? '已审核'
-                        : vendor.status === 'pending'
-                          ? '待审核'
-                          : '已拒绝'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-[#94A3B8] hover:bg-[#1E3A5F] hover:text-white"
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="end"
-                        className="border-[#1E3A5F] bg-[#0A1628] text-white"
-                      >
-                        {vendor.status === 'pending' && (
-                          <>
-                            <DropdownMenuItem
-                              className="focus:bg-[#1E3A5F]"
-                              onClick={() => {
-                                setSelectedVendor(vendor.id);
-                                setDialogOpen(true);
-                              }}
-                            >
-                              <CheckCircle className="mr-2 h-4 w-4 text-[#22C55E]" />
-                              审核通过
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="focus:bg-[#1E3A5F]">
-                              <XCircle className="mr-2 h-4 w-4 text-[#EF4444]" />
-                              拒绝申请
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        <DropdownMenuItem className="focus:bg-[#1E3A5F]">
-                          查看详情
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="focus:bg-[#1E3A5F]">
-                          编辑信息
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-[#94A3B8]">
+                    加载中...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : filteredVendors.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-[#94A3B8]">
+                    暂无厂家数据
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredVendors.map((vendor) => (
+                  <TableRow
+                    key={vendor.id}
+                    className="border-[#1E3A5F] hover:bg-[#0A1628]"
+                  >
+                    <TableCell className="font-medium text-white">
+                      {vendor.name}
+                    </TableCell>
+                    <TableCell className="text-[#94A3B8]">
+                      {vendor.contact_name}
+                    </TableCell>
+                    <TableCell className="text-[#94A3B8]">
+                      {vendor.contact_email}
+                    </TableCell>
+                    <TableCell className="text-[#94A3B8]">
+                      {vendor.contact_phone}
+                    </TableCell>
+                    <TableCell className="text-white">
+                      {vendor.device_count}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={`border-0 ${
+                          vendor.status === 'approved'
+                            ? 'bg-[#22C55E]/20 text-[#22C55E]'
+                            : vendor.status === 'pending'
+                              ? 'bg-[#F97316]/20 text-[#F97316]'
+                              : 'bg-[#EF4444]/20 text-[#EF4444]'
+                        }`}
+                      >
+                        {vendor.status === 'approved'
+                          ? '已审核'
+                          : vendor.status === 'pending'
+                            ? '待审核'
+                            : '已拒绝'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-[#94A3B8] hover:bg-[#1E3A5F] hover:text-white"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          className="border-[#1E3A5F] bg-[#0A1628] text-white"
+                        >
+                          {vendor.status === 'pending' && (
+                            <>
+                              <DropdownMenuItem
+                                className="focus:bg-[#1E3A5F]"
+                                onClick={() => handleApprove(vendor)}
+                              >
+                                <CheckCircle className="mr-2 h-4 w-4 text-[#22C55E]" />
+                                审核通过
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="focus:bg-[#1E3A5F]"
+                                onClick={() => handleReject(vendor)}
+                              >
+                                <XCircle className="mr-2 h-4 w-4 text-[#EF4444]" />
+                                拒绝申请
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          <DropdownMenuItem className="focus:bg-[#1E3A5F]">
+                            查看详情
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="focus:bg-[#1E3A5F]">
+                            编辑信息
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
