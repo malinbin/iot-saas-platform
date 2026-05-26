@@ -15,12 +15,15 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         name,
-        sn,
-        type,
+        serial_number,
+        device_type,
+        model,
         status,
         location,
-        customer_id,
+        owner_id,
         template_id,
+        vendor_id,
+        last_heartbeat_at,
         created_at,
         updated_at,
         device_templates (
@@ -68,11 +71,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { 
       name, 
-      sn, 
-      type, 
+      serial_number,
+      device_type,
+      model,
       template_id, 
       location, 
-      customer_id,
+      owner_id,
       vendor_id = 'vendor-001' // 实际应从session获取
     } = body;
 
@@ -93,11 +97,12 @@ export async function POST(request: NextRequest) {
       .insert({
         id: uuidv4(),
         name,
-        sn,
-        type,
+        serial_number,
+        device_type,
+        model,
         template_id,
         location,
-        customer_id,
+        owner_id,
         vendor_id,
         status: 'offline',
         created_at: new Date().toISOString(),

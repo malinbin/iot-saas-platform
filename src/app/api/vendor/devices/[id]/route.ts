@@ -16,13 +16,15 @@ export async function GET(
       .select(`
         id,
         name,
-        sn,
-        type,
+        serial_number,
+        device_type,
+        model,
         status,
         location,
-        customer_id,
+        owner_id,
         template_id,
         vendor_id,
+        last_heartbeat_at,
         created_at,
         updated_at,
         device_templates (

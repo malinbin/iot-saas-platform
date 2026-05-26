@@ -17,12 +17,15 @@ export async function GET(request: NextRequest) {
       .select(`
         id,
         name,
-        sn,
-        type,
+        serial_number,
+        device_type,
+        model,
         status,
         location,
         template_id,
         vendor_id,
+        owner_id,
+        last_heartbeat_at,
         created_at,
         updated_at,
         device_templates (
