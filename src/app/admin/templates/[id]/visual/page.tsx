@@ -427,6 +427,7 @@ export default function VisualTemplateEditor({
     'dashboard'
   );
   const [deviceType, setDeviceType] = useState('custom');
+  const [saving, setSaving] = useState(false);
 
   const selectedField = fields.find((f) => f.id === selectedFieldId);
 
@@ -499,6 +500,7 @@ export default function VisualTemplateEditor({
       return;
     }
 
+    setSaving(true);
     try {
       // 调用API保存
       const response = await fetch(`/api/admin/templates/${params.id}`, {
@@ -506,20 +508,33 @@ export default function VisualTemplateEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: templateName,
+          code: templateName.toLowerCase().replace(/\s+/g, '_'),
           category: templateCategory,
-          device_type: deviceType,
-          fields: fields,
+          description: `${templateName} - ${deviceType}`,
+          icon: 'Cog',
+          is_active: true,
+          fields: fields.map((f, index) => ({
+            ...f,
+            display_order: index,
+          })),
         }),
       });
 
-      if (response.ok) {
+      const data = await response.json();
+      
+      if (response.ok && data.template) {
         toast.success('模板保存成功');
-        router.push('/admin/templates');
+        setTimeout(() => {
+          router.push('/admin/templates');
+        }, 1000);
       } else {
-        toast.error('保存失败');
+        toast.error(data.error || '保存失败');
       }
     } catch (error) {
-      toast.error('保存失败');
+      console.error('Save error:', error);
+      toast.error('保存失败，请重试');
+    } finally {
+      setSaving(false);
     }
   };
 
