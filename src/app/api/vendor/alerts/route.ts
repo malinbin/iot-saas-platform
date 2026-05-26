@@ -22,7 +22,7 @@ export async function GET() {
       .from('alerts')
       .select(`
         *,
-        devices!inner(name, code, vendor_id)
+        devices!inner(id, name, serial_number, vendor_id)
       `)
       .eq('devices.vendor_id', vendors.id)
       .order('created_at', { ascending: false })
@@ -37,7 +37,7 @@ export async function GET() {
     const formattedAlerts = (alerts || []).map((alert: any) => ({
       id: alert.id,
       deviceName: alert.devices?.name || '未知设备',
-      deviceCode: alert.devices?.code || '',
+      deviceCode: alert.devices?.serial_number || '',
       level: alert.level,
       type: alert.type,
       message: alert.message,
