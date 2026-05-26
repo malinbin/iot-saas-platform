@@ -2,20 +2,18 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Phone, Lock, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Phone, Lock, Loader2, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     phone: '',
     password: '',
-    name: '',
-    code: '',
   });
   const [error, setError] = useState('');
+  const [remainingDays, setRemainingDays] = useState<number | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,28 +21,32 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      if (mode === 'login') {
-        // 登录
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: formData.phone,
-            password: formData.password,
-          }),
-        });
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: formData.phone,
+          password: formData.password,
+        }),
+      });
 
-        const data = await res.json();
-        
-        if (!res.ok) {
-          throw new Error(data.error || '登录失败');
-        }
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || '登录失败');
+      }
 
-        // 保存 token
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
-        // 根据角色跳转
+      // 保存 token
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      
+      // 显示剩余天数提示
+      if (data.user.remaining_days && data.user.remaining_days <= 30) {
+        setRemainingDays(data.user.remaining_days);
+      }
+      
+      // 根据角色跳转
+      setTimeout(() => {
         switch (data.user.role) {
           case 'admin':
             router.push('/admin');
@@ -55,26 +57,9 @@ export default function LoginPage() {
           default:
             router.push('/user');
         }
-      } else {
-        // 注册
-        const res = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData),
-        });
-
-        const data = await res.json();
-        
-        if (!res.ok) {
-          throw new Error(data.error || '注册失败');
-        }
-
-        // 注册成功后切换到登录
-        setMode('login');
-        setError('注册成功，请登录');
-      }
+      }, 500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失败');
+      setError(err instanceof Error ? err.message : '登录失败');
     } finally {
       setLoading(false);
     }
@@ -96,12 +81,8 @@ export default function LoginPage() {
         <div className="bg-white rounded-2xl shadow-lg p-6">
           {/* 标题 */}
           <div className="text-center mb-6">
-            <h1 className="text-xl font-bold text-gray-900">
-              {mode === 'login' ? '欢迎回来' : '注册账号'}
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              {mode === 'login' ? '登录您的账号继续使用' : '创建新账号开始使用'}
-            </p>
+            <h1 className="text-xl font-bold text-gray-900">欢迎回来</h1>
+            <p className="text-sm text-gray-500 mt-1">登录您的账号继续使用</p>
           </div>
 
           {/* 表单 */}
@@ -124,23 +105,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* 注册时的姓名 */}
-            {mode === 'register' && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  姓名
-                </label>
-                <input
-                  type="text"
-                  placeholder="请输入姓名"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] focus:border-transparent text-gray-900 placeholder:text-gray-400"
-                  required
-                />
-              </div>
-            )}
-
             {/* 密码 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -159,89 +123,61 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
                 >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" />
+                  )}
                 </button>
               </div>
             </div>
 
             {/* 错误提示 */}
             {error && (
-              <div className={`text-sm ${error.includes('成功') ? 'text-green-600' : 'text-red-500'} text-center`}>
-                {error}
+              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
-            {/* 提交按钮 */}
+            {/* 到期提示 */}
+            {remainingDays !== null && (
+              <div className="flex items-center gap-2 p-3 bg-orange-50 border border-orange-200 rounded-xl text-orange-600 text-sm">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span>账号将在 {remainingDays} 天后过期，请联系管理员续期</span>
+              </div>
+            )}
+
+            {/* 登录按钮 */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-[#0EA5E9] text-white rounded-xl font-medium hover:bg-[#0EA5E9]/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3 bg-gradient-to-r from-[#0EA5E9] to-[#38BDF8] text-white font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>处理中...</span>
+                  登录中...
                 </>
               ) : (
-                <span>{mode === 'login' ? '登 录' : '注 册'}</span>
+                '登 录'
               )}
             </button>
           </form>
 
-          {/* 切换登录/注册 */}
+          {/* 说明文字 */}
           <div className="mt-6 text-center text-sm text-gray-500">
-            {mode === 'login' ? (
-              <>
-                还没有账号？{' '}
-                <button
-                  onClick={() => setMode('register')}
-                  className="text-[#0EA5E9] font-medium"
-                >
-                  立即注册
-                </button>
-              </>
-            ) : (
-              <>
-                已有账号？{' '}
-                <button
-                  onClick={() => setMode('login')}
-                  className="text-[#0EA5E9] font-medium"
-                >
-                  立即登录
-                </button>
-              </>
-            )}
+            <p>账号由管理员统一创建，不支持自主注册</p>
+            <p className="mt-2">如有问题，请联系系统管理员</p>
           </div>
         </div>
 
-        {/* 其他登录方式 */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-400 mb-4">其他登录方式</p>
-          <div className="flex justify-center gap-4">
-            <button className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors">
-              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8.691 2.188C3.891 2.188 0 5.476 0 9.53c0 2.212 1.17 4.206 3.002 5.516l-.592 2.486a.333.333 0 00.479.362l2.901-1.684c.878.24 1.818.368 2.901.368 4.8 0 8.691-3.288 8.691-7.342 0-4.054-3.891-7.048-8.691-7.048z" />
-              </svg>
-            </button>
-            <button className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-200 transition-colors">
-              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.477 2 2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.879V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.989C18.343 21.129 22 16.99 22 12c0-5.523-4.477-10-10-10z" />
-              </svg>
-            </button>
-          </div>
+        {/* 底部说明 */}
+        <div className="mt-6 text-center text-xs text-gray-400">
+          <p>工业物联网 SaaS 平台</p>
         </div>
-      </div>
-
-      {/* 底部 */}
-      <div className="py-6 text-center">
-        <p className="text-xs text-gray-400">
-          登录即表示同意
-          <a href="#" className="text-gray-600 underline mx-1">用户协议</a>
-          和
-          <a href="#" className="text-gray-600 underline mx-1">隐私政策</a>
-        </p>
       </div>
     </div>
   );

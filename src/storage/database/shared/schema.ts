@@ -19,14 +19,17 @@ export const userProfiles = pgTable(
     role: varchar("role", { length: 20 }).notNull().default('user'), // user, vendor, admin
     vendor_id: varchar("vendor_id", { length: 36 }), // 所属厂家ID（商家端用户）
     is_active: boolean("is_active").default(true).notNull(),
+    expires_at: timestamp("expires_at", { withTimezone: true }), // 账号到期时间（null表示永久有效）
     last_login_at: timestamp("last_login_at", { withTimezone: true }),
     created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updated_at: timestamp("updated_at", { withTimezone: true }),
+    created_by: varchar("created_by", { length: 36 }), // 创建人ID
   },
   (table) => [
     index("user_profiles_email_idx").on(table.email),
     index("user_profiles_role_idx").on(table.role),
     index("user_profiles_vendor_id_idx").on(table.vendor_id),
+    index("user_profiles_expires_at_idx").on(table.expires_at),
   ]
 );
 
@@ -42,15 +45,18 @@ export const vendors = pgTable(
     contact_email: varchar("contact_email", { length: 255 }),
     address: text("address"),
     status: varchar("status", { length: 20 }).notNull().default('pending'), // pending, approved, rejected
+    expires_at: timestamp("expires_at", { withTimezone: true }), // 账号到期时间（null表示永久有效）
     device_count: integer("device_count").default(0),
     customer_count: integer("customer_count").default(0),
     monthly_revenue: numeric("monthly_revenue", { precision: 12, scale: 2 }).default('0'),
     created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updated_at: timestamp("updated_at", { withTimezone: true }),
+    created_by: varchar("created_by", { length: 36 }), // 创建人ID（管理员）
   },
   (table) => [
     index("vendors_code_idx").on(table.code),
     index("vendors_status_idx").on(table.status),
+    index("vendors_expires_at_idx").on(table.expires_at),
   ]
 );
 
