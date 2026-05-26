@@ -7,10 +7,9 @@ import {
   Users,
   AlertTriangle,
   TrendingUp,
-  TrendingDown,
   RefreshCw,
-  DollarSign,
   Activity,
+  FileText,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,7 +23,7 @@ interface DashboardStats {
   totalVendors: number;
   pendingVendors: number;
   totalUsers: number;
-  totalRevenue: number;
+  activeAlerts: number;
 }
 
 interface TrendData {
@@ -36,7 +35,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [deviceTrend, setDeviceTrend] = useState<Record<string, string | number>[]>([]);
-  const [revenueTrend, setRevenueTrend] = useState<Record<string, string | number>[]>([]);
   const [deviceDistribution, setDeviceDistribution] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -47,9 +45,8 @@ export default function AdminDashboard() {
       
       if (result.success) {
         setStats(result.data.stats);
-        setDeviceTrend(result.data.deviceTrend);
-        setRevenueTrend(result.data.revenueTrend);
-        setDeviceDistribution(result.data.deviceDistribution);
+        setDeviceTrend(result.data.deviceTrend || []);
+        setDeviceDistribution(result.data.deviceDistribution || []);
       }
     } catch (error) {
       console.error('Fetch dashboard data error:', error);
@@ -175,18 +172,18 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Total Revenue */}
+        {/* Active Alerts */}
         <Card className="bg-[#1E3A5F] border-[#2D4A6F]">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm text-[#94A3B8]">累计收益</div>
-                <div className="text-3xl font-bold text-white">
-                  ¥{(stats.totalRevenue ?? 0).toLocaleString()}
+                <div className="text-sm text-[#94A3B8]">活跃告警</div>
+                <div className="text-3xl font-bold text-[#F97316]">
+                  {stats.activeAlerts ?? 0}
                 </div>
               </div>
               <div className="rounded-full bg-[#F97316]/20 p-3">
-                <DollarSign className="h-6 w-6 text-[#F97316]" />
+                <AlertTriangle className="h-6 w-6 text-[#F97316]" />
               </div>
             </div>
           </CardContent>
@@ -269,43 +266,22 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Revenue Trend */}
+        {/* Device Distribution */}
         <Card className="bg-[#1E3A5F] border-[#2D4A6F]">
           <CardHeader>
-            <CardTitle className="text-lg text-white">收益趋势</CardTitle>
+            <CardTitle className="text-lg text-white">设备状态分布</CardTitle>
           </CardHeader>
           <CardContent>
-            {(revenueTrend?.length ?? 0) > 0 ? (
-              <AreaChartComponent
-                data={revenueTrend}
-                dataKey="value"
-                color="#F97316"
-                height={250}
-              />
+            {(deviceDistribution?.length ?? 0) > 0 ? (
+              <PieChartComponent data={deviceDistribution} height={250} />
             ) : (
               <div className="h-[250px] flex items-center justify-center text-[#94A3B8]">
-                暂无收益数据
+                暂无设备数据
               </div>
             )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Device Distribution */}
-      <Card className="bg-[#1E3A5F] border-[#2D4A6F]">
-        <CardHeader>
-          <CardTitle className="text-lg text-white">设备状态分布</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {(deviceDistribution?.length ?? 0) > 0 ? (
-            <PieChartComponent data={deviceDistribution} height={300} />
-          ) : (
-            <div className="h-[300px] flex items-center justify-center text-[#94A3B8]">
-              暂无设备数据
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
