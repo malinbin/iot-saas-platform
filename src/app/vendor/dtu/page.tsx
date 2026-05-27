@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Radio,
   Plus,
   Search,
-  MoreHorizontal,
   Eye,
   Edit,
   Trash2,
@@ -14,11 +14,10 @@ import {
   Wifi,
   WifiOff,
   Signal,
-  Activity,
-  Settings,
   FileText,
   Copy,
   Check,
+  X,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -37,11 +36,20 @@ interface DTUDevice {
 }
 
 export default function DTUManagementPage() {
+  const router = useRouter();
   const { toast } = useToast();
   const [devices, setDevices] = useState<DTUDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({
+    device_id: '',
+    name: '',
+    imei: '',
+    iccid: '',
+    connection_mode: 'mqtt',
+  });
 
   useEffect(() => {
     fetchDevices();
@@ -59,6 +67,57 @@ export default function DTUManagementPage() {
       console.error('Fetch DTU devices error:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddDevice = async () => {
+    if (!addForm.device_id) {
+      toast({ title: '请填写设备ID', variant: 'error' });
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/dtu/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          device_id: addForm.device_id,
+          imei: addForm.imei || undefined,
+          iccid: addForm.iccid || undefined,
+          name: addForm.name || `DTU-${addForm.device_id}`,
+          type: 'register',
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        toast({ title: '添加成功', description: `设备 ${addForm.device_id} 已添加` });
+        setShowAddModal(false);
+        setAddForm({ device_id: '', name: '', imei: '', iccid: '', connection_mode: 'mqtt' });
+        fetchDevices();
+      } else {
+        toast({ title: '添加失败', description: result.error, variant: 'error' });
+      }
+    } catch (error) {
+      toast({ title: '添加失败', description: '网络错误', variant: 'error' });
+    }
+  };
+
+  const handleDelete = async (device: DTUDevice) => {
+    if (!confirm(`确定要删除设备 ${device.name} 吗？`)) return;
+
+    try {
+      const response = await fetch(`/api/dtu/devices/${device.id}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+      if (result.success) {
+        toast({ title: '删除成功' });
+        fetchDevices();
+      } else {
+        toast({ title: '删除失败', description: result.error, variant: 'error' });
+      }
+    } catch (error) {
+      toast({ title: '删除失败', description: '网络错误', variant: 'error' });
     }
   };
 
@@ -116,6 +175,13 @@ export default function DTUManagementPage() {
                 配置指南
               </Link>
               <button
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                添加设备
+              </button>
+              <button
                 onClick={fetchDevices}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
               >
@@ -154,7 +220,7 @@ export default function DTUManagementPage() {
           </div>
         </div>
 
-        {/* Search & Actions */}
+        {/* Search */}
         <div className="flex items-center justify-between mb-6">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
@@ -179,15 +245,24 @@ export default function DTUManagementPage() {
             <Radio className="h-12 w-12 text-slate-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-slate-900 mb-2">暂无 DTU 设备</h3>
             <p className="text-slate-600 mb-4">
-              DTU 设备上线后将自动注册到平台
+              点击"添加设备"手动添加，或配置DTU设备连接后自动注册
             </p>
-            <Link
-              href="/vendor/dtu-config"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
-            >
-              <FileText className="h-4 w-4" />
-              查看配置指南
-            </Link>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                添加设备
+              </button>
+              <Link
+                href="/vendor/dtu-config"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <FileText className="h-4 w-4" />
+                查看配置指南
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="rounded-2xl border border-blue-100 bg-white overflow-hidden">
@@ -278,26 +353,25 @@ export default function DTUManagementPage() {
                       <td className="px-4 py-4">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => {
-                              toast({
-                                title: '查看设备详情',
-                                description: `设备 ${device.name} 详情页面开发中`,
-                              });
-                            }}
+                            onClick={() => router.push(`/vendor/dtu/${device.id}`)}
                             className="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                            title="查看详情"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => {
-                              toast({
-                                title: '编辑设备',
-                                description: `设备 ${device.name} 编辑功能开发中`,
-                              });
-                            }}
+                            onClick={() => router.push(`/vendor/dtu/${device.id}`)}
                             className="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                            title="编辑"
                           >
                             <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(device)}
+                            className="p-2 rounded-lg hover:bg-red-50 text-red-500 transition-colors"
+                            title="删除"
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </td>
@@ -308,53 +382,82 @@ export default function DTUManagementPage() {
             </table>
           </div>
         )}
-
-        {/* Test Data Upload */}
-        <div className="mt-8 p-6 rounded-2xl border border-blue-100 bg-white">
-          <h3 className="font-semibold text-slate-900 mb-4">测试数据上报</h3>
-          <p className="text-sm text-slate-600 mb-4">
-            点击下方按钮发送测试数据，验证 API 是否正常工作
-          </p>
-          <button
-            onClick={async () => {
-              try {
-                const response = await fetch('/api/dtu/data', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    device_id: 'TEST_DTU_001',
-                    imei: '86758' + Date.now().toString().slice(-10),
-                    data: {
-                      temperature: 25 + Math.random() * 5,
-                      humidity: 50 + Math.random() * 20,
-                      status: 'normal',
-                    },
-                    signal: Math.floor(15 + Math.random() * 15),
-                    type: 'data',
-                  }),
-                });
-                const result = await response.json();
-                toast({
-                  title: result.success ? '测试成功' : '测试失败',
-                  description: result.message || result.error,
-                });
-                if (result.success) {
-                  fetchDevices();
-                }
-              } catch (error) {
-                toast({
-                  title: '测试失败',
-                  description: '网络错误',
-                });
-              }
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
-          >
-            <Activity className="h-4 w-4" />
-            发送测试数据
-          </button>
-        </div>
       </div>
+
+      {/* Add Device Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-slate-900">添加 DTU 设备</h2>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  设备ID <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={addForm.device_id}
+                  onChange={(e) => setAddForm({ ...addForm, device_id: e.target.value })}
+                  placeholder="例如: DTU001"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">设备名称</label>
+                <input
+                  type="text"
+                  value={addForm.name}
+                  onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                  placeholder="例如: 生产线1号DTU"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">IMEI</label>
+                <input
+                  type="text"
+                  value={addForm.imei}
+                  onChange={(e) => setAddForm({ ...addForm, imei: e.target.value })}
+                  placeholder="15位IMEI号"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">ICCID</label>
+                <input
+                  type="text"
+                  value={addForm.iccid}
+                  onChange={(e) => setAddForm({ ...addForm, iccid: e.target.value })}
+                  placeholder="SIM卡ICCID号"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleAddDevice}
+                className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+              >
+                添加
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
