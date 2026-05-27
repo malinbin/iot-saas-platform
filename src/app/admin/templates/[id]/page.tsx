@@ -32,47 +32,63 @@ export default function TemplateDetailPage() {
   const params = useParams();
   const templateId = params.id as string;
   
-  const [template, setTemplate] = useState<any>(null);
-  const [fields, setFields] = useState<any[]>([]);
+  const [template, setTemplate] = useState<{
+    id: string;
+    name: string;
+    code: string;
+    category: string;
+    description: string;
+    icon: string;
+    is_active: boolean;
+    created_at: string;
+  } | null>(null);
+  const [fields, setFields] = useState<{
+    field_key: string;
+    field_name: string;
+    unit: string;
+    chart_type: string;
+    color: string;
+    show_in_dashboard: boolean;
+    show_in_detail?: boolean;
+  }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const loadTemplate = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/admin/templates/${templateId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setTemplate(data.template);
+          setFields(data.template?.fields || data.fields || []);
+        }
+      } catch (error) {
+        console.error('加载模板失败:', error);
+        // 模拟数据
+        setTemplate({
+          id: templateId,
+          name: '注塑机',
+          code: 'injection_molding',
+          category: '生产设备',
+          description: '塑料注塑成型设备，用于生产各类塑料制品',
+          icon: 'Cog',
+          is_active: true,
+          created_at: '2024-01-01T00:00:00Z',
+        });
+        setFields([
+          { field_key: 'temperature', field_name: '温度', unit: '℃', chart_type: 'line', color: '#ef4444', show_in_dashboard: true },
+          { field_key: 'pressure', field_name: '压力', unit: 'MPa', chart_type: 'line', color: '#ec4899', show_in_dashboard: true },
+          { field_key: 'speed', field_name: '转速', unit: 'rpm', chart_type: 'line', color: '#8b5cf6', show_in_dashboard: true },
+          { field_key: 'power', field_name: '功率', unit: 'kW', chart_type: 'bar', color: '#f59e0b', show_in_dashboard: true },
+          { field_key: 'efficiency', field_name: '效率', unit: '%', chart_type: 'gauge', color: '#22c55e', show_in_dashboard: true },
+          { field_key: 'output', field_name: '产量', unit: '件/h', chart_type: 'bar', color: '#06b6d4', show_in_dashboard: true },
+        ]);
+      }
+      setLoading(false);
+    };
     loadTemplate();
   }, [templateId]);
-
-  const loadTemplate = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/admin/templates/${templateId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setTemplate(data.template);
-        setFields(data.template?.fields || data.fields || []);
-      }
-    } catch (error) {
-      console.error('加载模板失败:', error);
-      // 模拟数据
-      setTemplate({
-        id: templateId,
-        name: '注塑机',
-        code: 'injection_molding',
-        category: '生产设备',
-        description: '塑料注塑成型设备，用于生产各类塑料制品',
-        icon: 'Cog',
-        is_active: true,
-        created_at: '2024-01-01T00:00:00Z',
-      });
-      setFields([
-        { field_key: 'temperature', field_name: '温度', unit: '℃', chart_type: 'line', color: '#ef4444', show_in_dashboard: true },
-        { field_key: 'pressure', field_name: '压力', unit: 'MPa', chart_type: 'line', color: '#ec4899', show_in_dashboard: true },
-        { field_key: 'speed', field_name: '转速', unit: 'rpm', chart_type: 'line', color: '#8b5cf6', show_in_dashboard: true },
-        { field_key: 'power', field_name: '功率', unit: 'kW', chart_type: 'bar', color: '#f59e0b', show_in_dashboard: true },
-        { field_key: 'efficiency', field_name: '效率', unit: '%', chart_type: 'gauge', color: '#22c55e', show_in_dashboard: true },
-        { field_key: 'output', field_name: '产量', unit: '件/h', chart_type: 'bar', color: '#06b6d4', show_in_dashboard: true },
-      ]);
-    }
-    setLoading(false);
-  };
 
   // 模拟趋势数据
   const trendData = Array.from({ length: 24 }, (_, i) => ({

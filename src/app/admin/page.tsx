@@ -35,7 +35,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [deviceTrend, setDeviceTrend] = useState<Record<string, string | number>[]>([]);
-  const [deviceDistribution, setDeviceDistribution] = useState<any[]>([]);
+  const [deviceDistribution, setDeviceDistribution] = useState<{name: string; value: number; color: string}[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchData = async () => {
