@@ -179,7 +179,7 @@ export default function VendorDevicesPage() {
     location: '',
     customer: '',
     description: '',
-    dtu_id: '',
+    dtu_id: 'none',
     dtu_port: '',
   });
   
