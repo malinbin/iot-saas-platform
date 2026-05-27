@@ -72,6 +72,7 @@ interface Template {
 }
 
 interface TemplateField {
+  id?: string;
   field_key: string;
   field_name: string;
   field_type: string;
@@ -614,7 +615,7 @@ export default function VendorDevicesPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     {templateFields.map((field) => (
-                      <div key={field.field_key} className="space-y-2">
+                      <div key={field.id || field.field_key} className="space-y-2">
                         <Label className="flex items-center gap-1">
                           {field.field_name}
                           {field.unit && <span className="text-slate-400 text-xs">({field.unit})</span>}
