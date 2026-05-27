@@ -323,7 +323,7 @@ export default function VendorDevicesPage() {
           type: selectedTemplate.name,
           template_id: selectedTemplate.id,
           vendor_id: vendor?.id || '',
-          dtu_id: newDevice.dtu_id || null,
+          dtu_id: newDevice.dtu_id && newDevice.dtu_id !== 'none' ? newDevice.dtu_id : null,
           dtu_port: newDevice.dtu_port ? parseInt(newDevice.dtu_port) : null,
         }),
       });
@@ -362,7 +362,7 @@ export default function VendorDevicesPage() {
       location: '',
       customer: '',
       description: '',
-      dtu_id: '',
+      dtu_id: 'none',
       dtu_port: '',
     });
     setSelectedTemplate(null);
@@ -556,7 +556,7 @@ export default function VendorDevicesPage() {
                           <SelectValue placeholder="选择DTU设备" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">不关联</SelectItem>
+                          <SelectItem value="none">不关联</SelectItem>
                           {dtuList.map((dtu) => (
                             <SelectItem key={dtu.id} value={dtu.id}>
                               {dtu.name || dtu.device_id} 
