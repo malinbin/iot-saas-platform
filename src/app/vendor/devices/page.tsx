@@ -90,6 +90,17 @@ interface Device {
   customer: string;
   lastUpdate: string;
   alerts: number;
+  dtu_id?: string;
+  dtu_name?: string;
+  dtu_device_id?: string;  // DTU的device_id字段
+}
+
+interface DTUDevice {
+  id: string;
+  device_id: string;
+  name: string;
+  online: boolean;
+  signal_strength?: number;
 }
 
 const mockDevices: Device[] = [
@@ -165,15 +176,31 @@ export default function VendorDevicesPage() {
     location: '',
     customer: '',
     description: '',
+    dtu_id: '',
+    dtu_port: '',
   });
   
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+  const [dtuList, setDtuList] = useState<DTUDevice[]>([]);
 
-  // 加载可用模板
+  // 加载可用模板和DTU列表
   useEffect(() => {
     loadTemplates();
     loadDevices();
+    loadDTUList();
   }, []);
+
+  const loadDTUList = async () => {
+    try {
+      const res = await fetch('/api/dtu/data');
+      if (res.ok) {
+        const data = await res.json();
+        setDtuList(data.data || []);
+      }
+    } catch (error) {
+      console.error('加载DTU列表失败:', error);
+    }
+  };
 
   const loadDevices = async () => {
     setLoading(true);
@@ -285,6 +312,8 @@ export default function VendorDevicesPage() {
           ...newDevice,
           type: selectedTemplate.name,
           template_id: selectedTemplate.id,
+          dtu_id: newDevice.dtu_id || null,
+          dtu_port: newDevice.dtu_port ? parseInt(newDevice.dtu_port) : null,
         }),
       });
 
@@ -322,6 +351,8 @@ export default function VendorDevicesPage() {
       location: '',
       customer: '',
       description: '',
+      dtu_id: '',
+      dtu_port: '',
     });
     setSelectedTemplate(null);
     setTemplateFields([]);
@@ -505,6 +536,36 @@ export default function VendorDevicesPage() {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label>关联DTU</Label>
+                      <Select 
+                        value={newDevice.dtu_id} 
+                        onValueChange={(v) => setNewDevice({ ...newDevice, dtu_id: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择DTU设备" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">不关联</SelectItem>
+                          {dtuList.map((dtu) => (
+                            <SelectItem key={dtu.id} value={dtu.id}>
+                              {dtu.name || dtu.device_id} 
+                              {dtu.online ? ' (在线)' : ' (离线)'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>DTU端口</Label>
+                      <Input
+                        type="number"
+                        value={newDevice.dtu_port}
+                        onChange={(e) => setNewDevice({ ...newDevice, dtu_port: e.target.value })}
+                        placeholder="如：1 (串口端口号)"
+                        disabled={!newDevice.dtu_id}
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label>安装位置</Label>
                       <Input
                         value={newDevice.location}
@@ -587,10 +648,10 @@ export default function VendorDevicesPage() {
               <TableRow className="bg-slate-50">
                 <TableHead>设备信息</TableHead>
                 <TableHead>模板</TableHead>
+                <TableHead>关联DTU</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>客户</TableHead>
                 <TableHead>最后更新</TableHead>
-                <TableHead>告警</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
@@ -618,6 +679,17 @@ export default function VendorDevicesPage() {
                     )}
                   </TableCell>
                   <TableCell>
+                    {device.dtu_device_id ? (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">
+                          {device.dtu_name || device.dtu_device_id}
+                        </Badge>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">未关联</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Badge className={statusColors[device.status]}>
                       {statusLabels[device.status]}
                     </Badge>
@@ -628,13 +700,6 @@ export default function VendorDevicesPage() {
                   </TableCell>
                   <TableCell className="text-sm text-slate-500">
                     {device.lastUpdate}
-                  </TableCell>
-                  <TableCell>
-                    {device.alerts > 0 ? (
-                      <Badge variant="destructive">{device.alerts}</Badge>
-                    ) : (
-                      <span className="text-slate-400">-</span>
-                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>

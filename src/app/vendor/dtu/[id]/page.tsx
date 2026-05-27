@@ -21,6 +21,7 @@ import {
   Edit,
   Save,
   X,
+  Box,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -56,12 +57,23 @@ interface DTUData {
   received_at: string;
 }
 
+interface ConnectedDevice {
+  id: string;
+  name: string;
+  serial_number: string;
+  device_type: string;
+  status: string;
+  dtu_port?: number;
+  last_heartbeat_at?: string;
+}
+
 export default function DTUDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
   const [device, setDevice] = useState<DTUDevice | null>(null);
   const [dataList, setDataList] = useState<DTUData[]>([]);
+  const [connectedDevices, setConnectedDevices] = useState<ConnectedDevice[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -80,7 +92,20 @@ export default function DTUDetailPage() {
   useEffect(() => {
     fetchDevice();
     fetchData();
+    fetchConnectedDevices();
   }, [deviceId]);
+
+  const fetchConnectedDevices = async () => {
+    try {
+      const response = await fetch(`/api/dtu/devices/${deviceId}/connected-devices`);
+      const data = await response.json();
+      if (data.success) {
+        setConnectedDevices(data.data || []);
+      }
+    } catch (error) {
+      console.error('获取关联设备失败:', error);
+    }
+  };
 
   const fetchDevice = async () => {
     try {
@@ -453,6 +478,52 @@ export default function DTUDetailPage() {
                       <pre className="text-sm text-slate-700 overflow-x-auto">
                         {JSON.stringify(item.parsed_data || item.raw_data, null, 2)}
                       </pre>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 关联设备 */}
+            <div className="p-6 rounded-2xl border border-blue-100 bg-white">
+              <h2 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                <Box className="h-5 w-5 text-blue-500" />
+                关联设备
+                <span className="text-sm font-normal text-slate-500">({connectedDevices.length} 台)</span>
+              </h2>
+              {connectedDevices.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-slate-500 mb-2">暂无关联设备</p>
+                  <p className="text-sm text-slate-400">在设备管理中将设备关联到此DTU</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {connectedDevices.map((dev) => (
+                    <div
+                      key={dev.id}
+                      className="p-3 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-blue-100 text-blue-600">
+                          <Box className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-slate-900">{dev.name}</div>
+                          <div className="text-xs text-slate-500">
+                            {dev.device_type} · {dev.serial_number}
+                            {dev.dtu_port && ` · 端口 ${dev.dtu_port}`}
+                          </div>
+                        </div>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        dev.status === 'online' 
+                          ? 'bg-green-100 text-green-700' 
+                          : dev.status === 'fault'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {dev.status === 'online' ? '在线' : dev.status === 'fault' ? '故障' : '离线'}
+                      </span>
                     </div>
                   ))}
                 </div>

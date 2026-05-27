@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
         owner_id,
         template_id,
         vendor_id,
+        dtu_id,
+        dtu_port,
         last_heartbeat_at,
         created_at,
         updated_at,
@@ -31,6 +33,12 @@ export async function GET(request: NextRequest) {
           name,
           code,
           category
+        ),
+        dtu_devices (
+          id,
+          device_id,
+          name,
+          online
         )
       `)
       .eq('vendor_id', vendorId)
@@ -52,6 +60,8 @@ export async function GET(request: NextRequest) {
         return {
           ...device,
           template_name: device.device_templates?.name,
+          dtu_name: device.dtu_devices?.name,
+          dtu_device_id: device.dtu_devices?.device_id,
           alerts: count || 0,
           lastUpdate: device.updated_at || device.created_at,
         };
@@ -71,13 +81,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { 
       name, 
+      sn,
       serial_number,
       device_type,
       model,
       template_id, 
       location, 
+      customer,
       owner_id,
-      vendor_id = 'vendor-001' // 实际应从session获取
+      vendor_id = 'vendor-001', // 实际应从session获取
+      dtu_id,
+      dtu_port
     } = body;
 
     // 验证模板权限
@@ -97,13 +111,15 @@ export async function POST(request: NextRequest) {
       .insert({
         id: uuidv4(),
         name,
-        serial_number,
+        serial_number: serial_number || sn,
         device_type,
         model,
         template_id,
         location,
         owner_id,
         vendor_id,
+        dtu_id: dtu_id || null,
+        dtu_port: dtu_port || null,
         status: 'offline',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
