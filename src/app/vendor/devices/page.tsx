@@ -306,10 +306,30 @@ export default function VendorDevicesPage() {
   };
 
   const handleAddDevice = async () => {
-    if (!newDevice.name || !newDevice.sn || !selectedTemplate) {
+    console.log('handleAddDevice called', { newDevice, selectedTemplate, vendorId: vendor?.id });
+    
+    if (!newDevice.name || !newDevice.sn) {
       toast({
         title: '请填写完整信息',
-        description: '设备名称、序列号和模板为必填项',
+        description: '设备名称和序列号为必填项',
+        variant: 'error',
+      });
+      return;
+    }
+
+    if (!selectedTemplate) {
+      toast({
+        title: '请选择设备模板',
+        description: '请先选择一个设备模板',
+        variant: 'error',
+      });
+      return;
+    }
+
+    if (!vendor?.id) {
+      toast({
+        title: '厂家信息缺失',
+        description: '请重新登录后再试',
         variant: 'error',
       });
       return;
@@ -642,7 +662,6 @@ export default function VendorDevicesPage() {
               </Button>
               <Button 
                 onClick={handleAddDevice}
-                disabled={!selectedTemplate}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 确认添加
