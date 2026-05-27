@@ -1,306 +1,360 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Cpu, Plus, RefreshCw, Save, Power } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Radio,
+  Plus,
+  Search,
+  MoreHorizontal,
+  Eye,
+  Edit,
+  Trash2,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  Signal,
+  Activity,
+  Settings,
+  FileText,
+  Copy,
+  Check,
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-interface DtuConfig {
+interface DTUDevice {
   id: string;
-  deviceName: string;
-  deviceCode: string;
-  protocol: string;
-  server: string;
-  port: number;
-  interval: number;
-  isActive: boolean;
-  lastOnline: string | null;
+  device_id: string;
+  name: string;
+  imei: string;
+  iccid: string;
+  online: boolean;
+  signal_strength: number;
+  connection_mode: string;
+  last_heartbeat_at: string;
+  last_data_at: string;
+  created_at: string;
 }
 
-export default function VendorDtuPage() {
+export default function DTUManagementPage() {
   const { toast } = useToast();
+  const [devices, setDevices] = useState<DTUDevice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dtuConfigs, setDtuConfigs] = useState<DtuConfig[]>([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  
-  // Form state
-  const [formData, setFormData] = useState({
-    deviceName: '',
-    deviceCode: '',
-    protocol: 'mqtt',
-    server: '',
-    port: '1883',
-    interval: '30',
-  });
+  const [search, setSearch] = useState('');
+  const [copied, setCopied] = useState<string | null>(null);
 
-  const fetchDtuConfigs = async () => {
+  useEffect(() => {
+    fetchDevices();
+  }, []);
+
+  const fetchDevices = async () => {
+    setLoading(true);
     try {
-      const response = await fetch('/api/vendor/dtu');
-      const result = await response.json();
-      
-      if (result.success) {
-        setDtuConfigs(result.data);
+      const response = await fetch('/api/dtu/data');
+      const data = await response.json();
+      if (data.success) {
+        setDevices(data.data || []);
       }
     } catch (error) {
-      console.error('Fetch DTU configs error:', error);
+      console.error('Fetch DTU devices error:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchDtuConfigs();
-  }, []);
-
-  const handleSave = async () => {
-    if (!formData.deviceName || !formData.server) {
-      toast({
-        title: '请填写完整信息',
-        variant: 'error',
-      });
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const response = await fetch('/api/vendor/dtu', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          port: parseInt(formData.port),
-          interval: parseInt(formData.interval),
-        }),
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        toast({
-          title: 'DTU配置已保存',
-        });
-        setDialogOpen(false);
-        fetchDtuConfigs();
-        setFormData({
-          deviceName: '',
-          deviceCode: '',
-          protocol: 'mqtt',
-          server: '',
-          port: '1883',
-          interval: '30',
-        });
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      toast({
-        title: '保存失败',
-        description: String(error),
-        variant: 'error',
-      });
-    } finally {
-      setSaving(false);
-    }
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
   };
 
-  const getProtocolBadge = (protocol: string) => {
-    switch (protocol) {
-      case 'mqtt':
-        return <Badge className="bg-[#22C55E]">MQTT</Badge>;
-      case 'http':
-        return <Badge className="bg-[#3B82F6]">HTTP</Badge>;
-      case 'tcp':
-        return <Badge className="bg-[#8B5CF6]">TCP</Badge>;
-      default:
-        return <Badge variant="outline">{protocol}</Badge>;
-    }
+  const filteredDevices = devices.filter(
+    (d) =>
+      d.device_id?.toLowerCase().includes(search.toLowerCase()) ||
+      d.name?.toLowerCase().includes(search.toLowerCase()) ||
+      d.imei?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const formatDate = (date: string) => {
+    if (!date) return '-';
+    return new Date(date).toLocaleString('zh-CN', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <RefreshCw className="h-8 w-8 animate-spin text-[#2563EB]" />
-      </div>
-    );
-  }
+  const getSignalLevel = (signal: number) => {
+    if (!signal || signal === 99) return { text: '无信号', color: 'text-slate-400' };
+    if (signal < 11) return { text: '弱', color: 'text-red-500' };
+    if (signal < 18) return { text: '中', color: 'text-yellow-500' };
+    return { text: '强', color: 'text-green-500' };
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gradient-to-b from-white to-blue-50/30">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-[#1E293B]">DTU配置</h1>
-          <p className="text-sm text-[#64748B]">
-            配置设备数据上报通信参数
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={fetchDtuConfigs} variant="outline">
-            <RefreshCw className="h-4 w-4 mr-2" />
-            刷新
-          </Button>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-[#2563EB] hover:bg-[#2563EB]/90">
-                <Plus className="h-4 w-4 mr-2" />
-                添加配置
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>添加DTU配置</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>设备名称</Label>
-                  <Input
-                    value={formData.deviceName}
-                    onChange={(e) => setFormData({ ...formData, deviceName: e.target.value })}
-                    placeholder="输入设备名称"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>设备编号</Label>
-                  <Input
-                    value={formData.deviceCode}
-                    onChange={(e) => setFormData({ ...formData, deviceCode: e.target.value })}
-                    placeholder="输入设备编号"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>通信协议</Label>
-                  <Select value={formData.protocol} onValueChange={(v) => setFormData({ ...formData, protocol: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="mqtt">MQTT</SelectItem>
-                      <SelectItem value="http">HTTP</SelectItem>
-                      <SelectItem value="tcp">TCP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>服务器地址</Label>
-                    <Input
-                      value={formData.server}
-                      onChange={(e) => setFormData({ ...formData, server: e.target.value })}
-                      placeholder="mqtt.example.com"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>端口</Label>
-                    <Input
-                      value={formData.port}
-                      onChange={(e) => setFormData({ ...formData, port: e.target.value })}
-                      placeholder="1883"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>上报间隔（秒）</Label>
-                  <Input
-                    value={formData.interval}
-                    onChange={(e) => setFormData({ ...formData, interval: e.target.value })}
-                    placeholder="30"
-                  />
-                </div>
+      <div className="border-b border-blue-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 text-white">
+                <Radio className="h-5 w-5" />
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  取消
-                </Button>
-                <Button onClick={handleSave} disabled={saving}>
-                  {saving ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                  保存
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              <div>
+                <h1 className="text-xl font-semibold text-slate-900">DTU 设备管理</h1>
+                <p className="text-sm text-slate-600">TAS-LTE-892G 4G DTU 设备</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/vendor/dtu-config"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
+              >
+                <FileText className="h-4 w-4" />
+                配置指南
+              </Link>
+              <button
+                onClick={fetchDevices}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+              >
+                <RefreshCw className="h-4 w-4" />
+                刷新
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* DTU Table */}
-      <Card className="border-[#E2E8F0] bg-white">
-        <CardHeader>
-          <CardTitle className="text-lg text-[#1E293B]">DTU配置列表</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {dtuConfigs.length === 0 ? (
-            <div className="text-center py-10 text-[#64748B]">
-              <Cpu className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>暂无DTU配置</p>
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Stats */}
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="p-4 rounded-xl border border-blue-100 bg-white">
+            <div className="text-2xl font-bold text-slate-900">{devices.length}</div>
+            <div className="text-sm text-slate-600">总设备数</div>
+          </div>
+          <div className="p-4 rounded-xl border border-blue-100 bg-white">
+            <div className="text-2xl font-bold text-green-600">
+              {devices.filter((d) => d.online).length}
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>设备</TableHead>
-                  <TableHead>协议</TableHead>
-                  <TableHead>服务器</TableHead>
-                  <TableHead>端口</TableHead>
-                  <TableHead>上报间隔</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead>最后在线</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dtuConfigs.map((dtu) => (
-                  <TableRow key={dtu.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{dtu.deviceName}</div>
-                        <div className="text-xs text-[#64748B]">{dtu.deviceCode}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{getProtocolBadge(dtu.protocol)}</TableCell>
-                    <TableCell>{dtu.server}</TableCell>
-                    <TableCell>{dtu.port}</TableCell>
-                    <TableCell>{dtu.interval}秒</TableCell>
-                    <TableCell>
-                      <Badge className={dtu.isActive ? 'bg-[#22C55E]' : 'bg-[#64748B]'}>
-                        {dtu.isActive ? '在线' : '离线'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-[#64748B]">
-                      {dtu.lastOnline ? new Date(dtu.lastOnline).toLocaleString() : '-'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+            <div className="text-sm text-slate-600">在线设备</div>
+          </div>
+          <div className="p-4 rounded-xl border border-blue-100 bg-white">
+            <div className="text-2xl font-bold text-slate-400">
+              {devices.filter((d) => !d.online).length}
+            </div>
+            <div className="text-sm text-slate-600">离线设备</div>
+          </div>
+          <div className="p-4 rounded-xl border border-blue-100 bg-white">
+            <div className="text-2xl font-bold text-blue-600">
+              {devices.filter((d) => d.connection_mode === 'mqtt').length}
+            </div>
+            <div className="text-sm text-slate-600">MQTT连接</div>
+          </div>
+        </div>
+
+        {/* Search & Actions */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="搜索设备ID、名称、IMEI..."
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-blue-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Device List */}
+        {loading ? (
+          <div className="p-12 text-center">
+            <RefreshCw className="h-8 w-8 text-blue-500 animate-spin mx-auto mb-4" />
+            <p className="text-slate-600">加载中...</p>
+          </div>
+        ) : filteredDevices.length === 0 ? (
+          <div className="p-12 rounded-2xl border border-blue-100 bg-white text-center">
+            <Radio className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-slate-900 mb-2">暂无 DTU 设备</h3>
+            <p className="text-slate-600 mb-4">
+              DTU 设备上线后将自动注册到平台
+            </p>
+            <Link
+              href="/vendor/dtu-config"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+            >
+              <FileText className="h-4 w-4" />
+              查看配置指南
+            </Link>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-blue-100 bg-white overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">设备</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">IMEI</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">状态</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">信号</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">最后心跳</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-slate-600">最后数据</th>
+                  <th className="px-4 py-3 text-right text-sm font-medium text-slate-600">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredDevices.map((device) => {
+                  const signal = getSignalLevel(device.signal_strength);
+                  return (
+                    <tr key={device.id} className="hover:bg-blue-50/50 transition-colors">
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`p-2 rounded-lg ${
+                              device.online
+                                ? 'bg-green-100 text-green-600'
+                                : 'bg-slate-100 text-slate-400'
+                            }`}
+                          >
+                            <Radio className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-slate-900">{device.name}</div>
+                            <div className="text-sm text-slate-500 flex items-center gap-2">
+                              {device.device_id}
+                              <button
+                                onClick={() => copyToClipboard(device.device_id, device.id)}
+                                className="p-0.5 hover:bg-slate-200 rounded"
+                              >
+                                {copied === device.id ? (
+                                  <Check className="h-3 w-3 text-green-500" />
+                                ) : (
+                                  <Copy className="h-3 w-3 text-slate-400" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <code className="text-sm text-slate-600">{device.imei || '-'}</code>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${
+                            device.online
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {device.online ? (
+                            <>
+                              <Wifi className="h-3.5 w-3.5" />
+                              在线
+                            </>
+                          ) : (
+                            <>
+                              <WifiOff className="h-3.5 w-3.5" />
+                              离线
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <Signal className={`h-4 w-4 ${signal.color}`} />
+                          <span className="text-sm text-slate-600">
+                            {device.signal_strength || '-'} ({signal.text})
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-slate-600">
+                        {formatDate(device.last_heartbeat_at)}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-slate-600">
+                        {formatDate(device.last_data_at)}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              toast({
+                                title: '查看设备详情',
+                                description: `设备 ${device.name} 详情页面开发中`,
+                              });
+                            }}
+                            className="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              toast({
+                                title: '编辑设备',
+                                description: `设备 ${device.name} 编辑功能开发中`,
+                              });
+                            }}
+                            className="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Test Data Upload */}
+        <div className="mt-8 p-6 rounded-2xl border border-blue-100 bg-white">
+          <h3 className="font-semibold text-slate-900 mb-4">测试数据上报</h3>
+          <p className="text-sm text-slate-600 mb-4">
+            点击下方按钮发送测试数据，验证 API 是否正常工作
+          </p>
+          <button
+            onClick={async () => {
+              try {
+                const response = await fetch('/api/dtu/data', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    device_id: 'TEST_DTU_001',
+                    imei: '86758' + Date.now().toString().slice(-10),
+                    data: {
+                      temperature: 25 + Math.random() * 5,
+                      humidity: 50 + Math.random() * 20,
+                      status: 'normal',
+                    },
+                    signal: Math.floor(15 + Math.random() * 15),
+                    type: 'data',
+                  }),
+                });
+                const result = await response.json();
+                toast({
+                  title: result.success ? '测试成功' : '测试失败',
+                  description: result.message || result.error,
+                });
+                if (result.success) {
+                  fetchDevices();
+                }
+              } catch (error) {
+                toast({
+                  title: '测试失败',
+                  description: '网络错误',
+                });
+              }
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+          >
+            <Activity className="h-4 w-4" />
+            发送测试数据
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

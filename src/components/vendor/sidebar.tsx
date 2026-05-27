@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
+  Radio,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ import {
 const menuItems = [
   { icon: LayoutDashboard, label: '数据概览', href: '/vendor' },
   { icon: Box, label: '设备管理', href: '/vendor/devices' },
+  { icon: Radio, label: 'DTU设备', href: '/vendor/dtu' },
   { icon: Activity, label: '远程运维', href: '/vendor/monitor' },
   { icon: Users, label: '客户管理', href: '/vendor/customers' },
   { icon: AlertTriangle, label: '告警中心', href: '/vendor/alerts' },
