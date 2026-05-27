@@ -5,8 +5,13 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 export async function GET(request: NextRequest) {
   try {
     const supabaseClient = getSupabaseClient();
-    // 从请求头或cookie获取厂家ID（实际应从认证信息获取）
-    const vendorId = request.headers.get('x-vendor-id') || 'vendor_1';
+    // 从URL参数或请求头获取厂家ID
+    const { searchParams } = new URL(request.url);
+    const vendorId = searchParams.get('vendor_id') || request.headers.get('x-vendor-id') || '';
+
+    if (!vendorId) {
+      return NextResponse.json({ templates: [] });
+    }
 
     // 查询厂家有权限的模板
     const { data: permissions, error } = await supabaseClient

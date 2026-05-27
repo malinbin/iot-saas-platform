@@ -59,6 +59,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
+import { useVendorAuth } from '@/contexts/vendor-auth';
 
 interface Template {
   id: string;
@@ -160,6 +161,7 @@ const statusLabels = {
 export default function VendorDevicesPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { vendor } = useVendorAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [devices, setDevices] = useState<Device[]>([]);
@@ -186,9 +188,15 @@ export default function VendorDevicesPage() {
   // 加载可用模板和DTU列表
   useEffect(() => {
     loadTemplates();
-    loadDevices();
     loadDTUList();
   }, []);
+
+  // 当 vendor 信息加载后，加载设备列表
+  useEffect(() => {
+    if (vendor?.id) {
+      loadDevices();
+    }
+  }, [vendor?.id]);
 
   const loadDTUList = async () => {
     try {
@@ -205,7 +213,8 @@ export default function VendorDevicesPage() {
   const loadDevices = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/vendor/devices');
+      const vendorId = vendor?.id || '';
+      const res = await fetch(`/api/vendor/devices?vendor_id=${encodeURIComponent(vendorId)}`);
       if (res.ok) {
         const data = await res.json();
         setDevices(data.data || []);
@@ -220,7 +229,8 @@ export default function VendorDevicesPage() {
   const loadTemplates = async () => {
     setLoadingTemplates(true);
     try {
-      const res = await fetch('/api/vendor/templates');
+      const vendorId = vendor?.id || '';
+      const res = await fetch(`/api/vendor/templates?vendor_id=${encodeURIComponent(vendorId)}`);
       if (res.ok) {
         const data = await res.json();
         setTemplates(data.templates || []);
@@ -312,6 +322,7 @@ export default function VendorDevicesPage() {
           ...newDevice,
           type: selectedTemplate.name,
           template_id: selectedTemplate.id,
+          vendor_id: vendor?.id || '',
           dtu_id: newDevice.dtu_id || null,
           dtu_port: newDevice.dtu_port ? parseInt(newDevice.dtu_port) : null,
         }),
