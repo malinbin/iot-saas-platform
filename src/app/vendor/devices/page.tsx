@@ -337,7 +337,8 @@ export default function VendorDevicesPage() {
 
     const requestBody = {
       ...newDevice,
-      type: selectedTemplate.name,
+      device_type: selectedTemplate.name, // 设备类型（必填）
+      model: selectedTemplate.name, // 型号
       template_id: selectedTemplate.id,
       vendor_id: vendor?.id || '',
       dtu_id: newDevice.dtu_id && newDevice.dtu_id !== 'none' ? newDevice.dtu_id : null,
