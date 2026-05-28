@@ -311,6 +311,9 @@ export default function VendorDevicesPage() {
     console.log('selectedTemplate:', selectedTemplate);
     console.log('vendor:', vendor);
     
+    // 使用 alert 确保能看到反馈
+    alert('开始添加设备...');
+    
     // 显示开始处理的提示
     toast({
       title: '正在处理...',
@@ -319,6 +322,7 @@ export default function VendorDevicesPage() {
     
     if (!newDevice.name || !newDevice.sn) {
       console.log('验证失败: 设备名称或序列号为空');
+      alert('请填写设备名称和序列号');
       toast({
         title: '请填写完整信息',
         description: '设备名称和序列号为必填项',
@@ -329,6 +333,7 @@ export default function VendorDevicesPage() {
 
     if (!selectedTemplate) {
       console.log('验证失败: 未选择模板');
+      alert('请选择设备模板');
       toast({
         title: '请选择设备模板',
         description: '请先选择一个设备模板',
@@ -339,6 +344,7 @@ export default function VendorDevicesPage() {
 
     if (!vendor?.id) {
       console.log('验证失败: 厂家信息缺失');
+      alert('厂家信息缺失，请重新登录');
       toast({
         title: '厂家信息缺失',
         description: '请重新登录后再试',
@@ -681,7 +687,13 @@ export default function VendorDevicesPage() {
                 取消
               </Button>
               <Button 
-                onClick={handleAddDevice}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('=== 按钮被点击 ===');
+                  handleAddDevice();
+                }}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 确认添加
