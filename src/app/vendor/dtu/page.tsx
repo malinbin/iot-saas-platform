@@ -18,6 +18,7 @@ import {
   Copy,
   Check,
   X,
+  Settings2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -167,6 +168,13 @@ export default function DTUManagementPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <Link
+                href="/vendor/dtu/parsing-rules"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors"
+              >
+                <Settings2 className="h-4 w-4" />
+                解析规则
+              </Link>
               <Link
                 href="/vendor/dtu-config"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
