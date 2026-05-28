@@ -311,50 +311,30 @@ export default function VendorDevicesPage() {
     console.log('selectedTemplate:', selectedTemplate);
     console.log('vendor:', vendor);
     
-    // 使用 alert 确保能看到反馈
-    alert('开始添加设备...');
-    
-    // 显示开始处理的提示
-    toast({
-      title: '正在处理...',
-      description: '正在验证表单数据',
-    });
-    
+    // 第一步：验证设备名称和序列号
     if (!newDevice.name || !newDevice.sn) {
       console.log('验证失败: 设备名称或序列号为空');
-      alert('请填写设备名称和序列号');
-      toast({
-        title: '请填写完整信息',
-        description: '设备名称和序列号为必填项',
-        variant: 'error',
-      });
+      alert('❌ 请填写设备名称和序列号');
       return;
     }
+    alert('✅ 步骤1: 设备名称和序列号已填写');
 
+    // 第二步：验证模板选择
     if (!selectedTemplate) {
       console.log('验证失败: 未选择模板');
-      alert('请选择设备模板');
-      toast({
-        title: '请选择设备模板',
-        description: '请先选择一个设备模板',
-        variant: 'error',
-      });
+      alert('❌ 请选择设备模板');
       return;
     }
+    alert('✅ 步骤2: 已选择模板 - ' + selectedTemplate.name);
 
+    // 第三步：验证厂家信息
     if (!vendor?.id) {
       console.log('验证失败: 厂家信息缺失');
-      alert('厂家信息缺失，请重新登录');
-      toast({
-        title: '厂家信息缺失',
-        description: '请重新登录后再试',
-        variant: 'error',
-      });
+      alert('❌ 厂家信息缺失，请重新登录');
       return;
     }
+    alert('✅ 步骤3: 厂家信息正常 - ' + vendor.id);
 
-    console.log('表单验证通过，准备发送请求');
-    
     const requestBody = {
       ...newDevice,
       type: selectedTemplate.name,
@@ -364,6 +344,7 @@ export default function VendorDevicesPage() {
       dtu_port: newDevice.dtu_port ? parseInt(newDevice.dtu_port) : null,
     };
     console.log('请求体:', JSON.stringify(requestBody, null, 2));
+    alert('📦 步骤4: 准备发送请求...\n' + JSON.stringify(requestBody, null, 2).substring(0, 200));
 
     try {
       console.log('开始发送 POST 请求到 /api/vendor/devices');
@@ -378,6 +359,7 @@ export default function VendorDevicesPage() {
       console.log('响应数据:', data);
 
       if (res.ok && data.success) {
+        alert('🎉 添加成功！设备 ' + newDevice.name + ' 已添加');
         toast({
           title: '设备添加成功',
           description: `设备 ${newDevice.name} 已添加到系统`,
@@ -386,6 +368,7 @@ export default function VendorDevicesPage() {
         resetForm();
         loadDevices(); // 刷新设备列表
       } else {
+        alert('❌ 添加失败: ' + (data.error || '未知错误') + '\n\n详情: ' + JSON.stringify(data));
         toast({
           title: '添加失败',
           description: data.error || '请稍后重试',
@@ -394,9 +377,11 @@ export default function VendorDevicesPage() {
       }
     } catch (error) {
       console.error('添加设备异常:', error);
+      const errorMsg = error instanceof Error ? error.message : '未知错误';
+      alert('❌ 网络错误: ' + errorMsg);
       toast({
         title: '添加失败',
-        description: `网络错误: ${error instanceof Error ? error.message : '未知错误'}`,
+        description: `网络错误: ${errorMsg}`,
         variant: 'error',
       });
     }
