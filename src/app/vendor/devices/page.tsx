@@ -306,9 +306,19 @@ export default function VendorDevicesPage() {
   };
 
   const handleAddDevice = async () => {
-    console.log('handleAddDevice called', { newDevice, selectedTemplate, vendorId: vendor?.id });
+    console.log('=== handleAddDevice 开始执行 ===');
+    console.log('newDevice:', JSON.stringify(newDevice));
+    console.log('selectedTemplate:', selectedTemplate);
+    console.log('vendor:', vendor);
+    
+    // 显示开始处理的提示
+    toast({
+      title: '正在处理...',
+      description: '正在验证表单数据',
+    });
     
     if (!newDevice.name || !newDevice.sn) {
+      console.log('验证失败: 设备名称或序列号为空');
       toast({
         title: '请填写完整信息',
         description: '设备名称和序列号为必填项',
@@ -318,6 +328,7 @@ export default function VendorDevicesPage() {
     }
 
     if (!selectedTemplate) {
+      console.log('验证失败: 未选择模板');
       toast({
         title: '请选择设备模板',
         description: '请先选择一个设备模板',
@@ -327,6 +338,7 @@ export default function VendorDevicesPage() {
     }
 
     if (!vendor?.id) {
+      console.log('验证失败: 厂家信息缺失');
       toast({
         title: '厂家信息缺失',
         description: '请重新登录后再试',
@@ -335,21 +347,29 @@ export default function VendorDevicesPage() {
       return;
     }
 
+    console.log('表单验证通过，准备发送请求');
+    
+    const requestBody = {
+      ...newDevice,
+      type: selectedTemplate.name,
+      template_id: selectedTemplate.id,
+      vendor_id: vendor?.id || '',
+      dtu_id: newDevice.dtu_id && newDevice.dtu_id !== 'none' ? newDevice.dtu_id : null,
+      dtu_port: newDevice.dtu_port ? parseInt(newDevice.dtu_port) : null,
+    };
+    console.log('请求体:', JSON.stringify(requestBody, null, 2));
+
     try {
+      console.log('开始发送 POST 请求到 /api/vendor/devices');
       const res = await fetch('/api/vendor/devices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newDevice,
-          type: selectedTemplate.name,
-          template_id: selectedTemplate.id,
-          vendor_id: vendor?.id || '',
-          dtu_id: newDevice.dtu_id && newDevice.dtu_id !== 'none' ? newDevice.dtu_id : null,
-          dtu_port: newDevice.dtu_port ? parseInt(newDevice.dtu_port) : null,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log('收到响应，状态码:', res.status);
       const data = await res.json();
+      console.log('响应数据:', data);
 
       if (res.ok && data.success) {
         toast({
@@ -367,10 +387,10 @@ export default function VendorDevicesPage() {
         });
       }
     } catch (error) {
-      console.error('添加设备失败:', error);
+      console.error('添加设备异常:', error);
       toast({
         title: '添加失败',
-        description: '网络错误，请稍后重试',
+        description: `网络错误: ${error instanceof Error ? error.message : '未知错误'}`,
         variant: 'error',
       });
     }
